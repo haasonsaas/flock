@@ -1098,121 +1098,161 @@ async function renderAnalyticsView() {
   // Calculate metrics
   const metrics = calculateAnalyticsMetrics(contacts, interactions);
 
+  // Determine health status text and class
+  const healthStatus = metrics.overallHealth >= 70 ? 'OPTIMAL' :
+                       metrics.overallHealth >= 40 ? 'MODERATE' : 'CRITICAL';
+  const healthClass = metrics.overallHealth >= 70 ? 'optimal' :
+                      metrics.overallHealth >= 40 ? 'moderate' : 'critical';
+
   container.innerHTML = `
-    <div class="flock-analytics-grid">
-      <!-- Relationship Health Overview -->
-      <div class="flock-analytics-card flock-analytics-health">
-        <h3 class="flock-analytics-title">Relationship Health</h3>
-        <div class="flock-health-meter">
-          <div class="flock-health-bar" style="width: ${metrics.overallHealth}%"></div>
+    <div class="mc-dashboard">
+      <!-- Mission Control Header -->
+      <div class="mc-header">
+        <div class="mc-header-left">
+          <span class="mc-label">FLOCK ANALYTICS</span>
+          <span class="mc-timestamp">${new Date().toLocaleTimeString('en-US', { hour12: false })}</span>
         </div>
-        <div class="flock-health-score">${metrics.overallHealth}%</div>
-        <div class="flock-health-breakdown">
-          <div class="flock-health-segment flock-health-strong">
-            <span class="flock-segment-count">${metrics.healthBreakdown.strong}</span>
-            <span class="flock-segment-label">Strong</span>
-          </div>
-          <div class="flock-health-segment flock-health-medium">
-            <span class="flock-segment-count">${metrics.healthBreakdown.medium}</span>
-            <span class="flock-segment-label">Medium</span>
-          </div>
-          <div class="flock-health-segment flock-health-weak">
-            <span class="flock-segment-count">${metrics.healthBreakdown.weak}</span>
-            <span class="flock-segment-label">Weak</span>
-          </div>
+        <div class="mc-header-right">
+          <span class="mc-status mc-status-${healthClass}">${healthStatus}</span>
         </div>
       </div>
 
-      <!-- Growth Trend -->
-      <div class="flock-analytics-card flock-analytics-growth">
-        <h3 class="flock-analytics-title">Growth (30 days)</h3>
-        <div class="flock-growth-chart">
-          ${renderGrowthChart(metrics.growthData)}
+      <!-- Primary Metrics Row -->
+      <div class="mc-primary-row">
+        <!-- Health Gauge -->
+        <div class="mc-gauge-container">
+          <div class="mc-gauge">
+            <svg viewBox="0 0 100 100" class="mc-gauge-svg">
+              <circle cx="50" cy="50" r="42" class="mc-gauge-bg"/>
+              <circle cx="50" cy="50" r="42" class="mc-gauge-fill mc-gauge-${healthClass}"
+                      style="stroke-dasharray: ${metrics.overallHealth * 2.64} 264"/>
+              <circle cx="50" cy="50" r="32" class="mc-gauge-inner"/>
+            </svg>
+            <div class="mc-gauge-value">
+              <span class="mc-gauge-number">${metrics.overallHealth}</span>
+              <span class="mc-gauge-unit">%</span>
+            </div>
+            <div class="mc-gauge-pulse mc-pulse-${healthClass}"></div>
+          </div>
+          <div class="mc-gauge-label">HEALTH INDEX</div>
         </div>
-        <div class="flock-growth-stats">
-          <div class="flock-growth-stat">
-            <span class="flock-growth-value ${metrics.growthTrend >= 0 ? 'positive' : 'negative'}">
+
+        <!-- Quick Stats -->
+        <div class="mc-stats-grid">
+          <div class="mc-stat">
+            <span class="mc-stat-value mc-stat-success">${metrics.healthBreakdown.strong}</span>
+            <span class="mc-stat-label">STRONG</span>
+          </div>
+          <div class="mc-stat">
+            <span class="mc-stat-value mc-stat-warning">${metrics.healthBreakdown.medium}</span>
+            <span class="mc-stat-label">MEDIUM</span>
+          </div>
+          <div class="mc-stat">
+            <span class="mc-stat-value mc-stat-danger">${metrics.healthBreakdown.weak}</span>
+            <span class="mc-stat-label">WEAK</span>
+          </div>
+          <div class="mc-stat mc-stat-highlight">
+            <span class="mc-stat-value ${metrics.growthTrend >= 0 ? 'mc-stat-success' : 'mc-stat-danger'}">
               ${metrics.growthTrend >= 0 ? '+' : ''}${metrics.growthTrend}
             </span>
-            <span class="flock-growth-label">contacts this month</span>
+            <span class="mc-stat-label">30D GROWTH</span>
           </div>
         </div>
       </div>
 
-      <!-- Stage Distribution -->
-      <div class="flock-analytics-card flock-analytics-stages">
-        <h3 class="flock-analytics-title">Pipeline Distribution</h3>
-        <div class="flock-stage-bars">
-          ${Object.entries(metrics.stageDistribution).map(([stage, count]) => `
-            <div class="flock-stage-bar-row">
-              <span class="flock-stage-bar-label">${stage}</span>
-              <div class="flock-stage-bar-track">
-                <div class="flock-stage-bar-fill stage-${stage}" style="width: ${contacts.length > 0 ? (count / contacts.length * 100) : 0}%"></div>
+      <!-- Pipeline Section -->
+      <div class="mc-section">
+        <div class="mc-section-header">
+          <span class="mc-section-title">PIPELINE</span>
+          <span class="mc-section-total">${contacts.length} CONTACTS</span>
+        </div>
+        <div class="mc-pipeline">
+          ${Object.entries(metrics.stageDistribution).map(([stage, count], i) => {
+            const pct = contacts.length > 0 ? (count / contacts.length * 100) : 0;
+            return `
+              <div class="mc-pipe-row" style="animation-delay: ${i * 50}ms">
+                <span class="mc-pipe-label">${stage.toUpperCase()}</span>
+                <div class="mc-pipe-track">
+                  <div class="mc-pipe-fill mc-pipe-${stage}" style="--target-width: ${pct}%"></div>
+                  <div class="mc-pipe-glow mc-pipe-${stage}"></div>
+                </div>
+                <span class="mc-pipe-value">${count}</span>
               </div>
-              <span class="flock-stage-bar-value">${count}</span>
-            </div>
-          `).join('')}
+            `;
+          }).join('')}
         </div>
       </div>
 
-      <!-- Activity Heatmap (Last 7 days) -->
-      <div class="flock-analytics-card flock-analytics-activity">
-        <h3 class="flock-analytics-title">Recent Activity</h3>
-        <div class="flock-activity-heatmap">
-          ${metrics.activityByDay.map(day => `
-            <div class="flock-activity-day">
-              <div class="flock-activity-cell ${getActivityLevel(day.count)}" title="${day.name}: ${day.count} interactions"></div>
-              <span class="flock-activity-label">${day.shortName}</span>
-            </div>
-          `).join('')}
+      <!-- Activity Timeline -->
+      <div class="mc-section">
+        <div class="mc-section-header">
+          <span class="mc-section-title">ACTIVITY · 7 DAYS</span>
         </div>
-        <div class="flock-activity-legend">
-          <span>Less</span>
-          <div class="flock-legend-cells">
-            <div class="flock-activity-cell activity-none"></div>
-            <div class="flock-activity-cell activity-low"></div>
-            <div class="flock-activity-cell activity-medium"></div>
-            <div class="flock-activity-cell activity-high"></div>
+        <div class="mc-timeline">
+          ${metrics.activityByDay.map((day, i) => {
+            const level = getActivityLevel(day.count);
+            const height = day.count === 0 ? 4 : Math.min(32, 8 + day.count * 6);
+            return `
+              <div class="mc-timeline-bar" style="animation-delay: ${i * 60}ms">
+                <div class="mc-bar-fill ${level}" style="height: ${height}px"></div>
+                <span class="mc-bar-label">${day.shortName}</span>
+                <span class="mc-bar-count">${day.count}</span>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+
+      <!-- Tags & Attention Split -->
+      <div class="mc-split-row">
+        <!-- Tags -->
+        <div class="mc-mini-section">
+          <div class="mc-section-header">
+            <span class="mc-section-title">TOP TAGS</span>
           </div>
-          <span>More</span>
-        </div>
-      </div>
-
-      <!-- Top Tags -->
-      <div class="flock-analytics-card flock-analytics-tags">
-        <h3 class="flock-analytics-title">Popular Tags</h3>
-        <div class="flock-top-tags">
-          ${metrics.topTags.length > 0 ? metrics.topTags.map(tag => `
-            <div class="flock-top-tag">
-              <span class="flock-top-tag-name">${escapeHtml(tag.name)}</span>
-              <span class="flock-top-tag-count">${tag.count}</span>
-            </div>
-          `).join('') : '<p class="flock-analytics-empty">No tags yet</p>'}
-        </div>
-      </div>
-
-      <!-- Contacts Needing Attention -->
-      <div class="flock-analytics-card flock-analytics-attention">
-        <h3 class="flock-analytics-title">Needs Attention</h3>
-        <div class="flock-attention-list">
-          ${metrics.needsAttention.length > 0 ? metrics.needsAttention.slice(0, 4).map(contact => `
-            <div class="flock-attention-item" data-username="${escapeHtml(contact.username)}">
-              <img class="flock-attention-avatar" src="${escapeHtml(contact.profileImageUrl || '')}" alt="${escapeHtml(contact.displayName)}" onerror="this.style.display='none'">
-              <div class="flock-attention-info">
-                <span class="flock-attention-name">${escapeHtml(contact.displayName || contact.username)}</span>
-                <span class="flock-attention-reason">${contact.attentionReason}</span>
+          <div class="mc-tags">
+            ${metrics.topTags.length > 0 ? metrics.topTags.slice(0, 4).map((tag, i) => `
+              <div class="mc-tag" style="animation-delay: ${i * 40}ms">
+                <span class="mc-tag-name">${escapeHtml(tag.name)}</span>
+                <span class="mc-tag-count">${tag.count}</span>
               </div>
-            </div>
-          `).join('') : '<p class="flock-analytics-empty">All caught up!</p>'}
+            `).join('') : '<div class="mc-empty">No tags</div>'}
+          </div>
+        </div>
+
+        <!-- Attention -->
+        <div class="mc-mini-section">
+          <div class="mc-section-header">
+            <span class="mc-section-title">ATTENTION</span>
+            ${metrics.needsAttention.length > 0 ? `<span class="mc-alert-badge">${metrics.needsAttention.length}</span>` : ''}
+          </div>
+          <div class="mc-attention">
+            ${metrics.needsAttention.length > 0 ? metrics.needsAttention.slice(0, 3).map((contact, i) => `
+              <div class="mc-attention-row" data-username="${escapeHtml(contact.username)}" style="animation-delay: ${i * 40}ms">
+                <img class="mc-attention-avatar" src="${escapeHtml(contact.profileImageUrl || '')}" alt="" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22><circle cx=%2212%22 cy=%228%22 r=%224%22 fill=%22%23536471%22/><path d=%22M4 20c0-4 4-6 8-6s8 2 8 6%22 fill=%22%23536471%22/></svg>'">
+                <span class="mc-attention-name">${escapeHtml(contact.displayName || contact.username)}</span>
+              </div>
+            `).join('') : '<div class="mc-empty">All clear</div>'}
+          </div>
         </div>
       </div>
+
+      <!-- Scanline overlay for that terminal feel -->
+      <div class="mc-scanlines"></div>
     </div>
   `;
 
   // Add click handlers for attention items
-  container.querySelectorAll('.flock-attention-item').forEach(item => {
+  container.querySelectorAll('.mc-attention-row').forEach(item => {
     item.addEventListener('click', () => {
       showContactDetail(item.dataset.username);
+    });
+  });
+
+  // Trigger animations
+  requestAnimationFrame(() => {
+    container.querySelectorAll('.mc-pipe-fill').forEach(el => {
+      el.style.width = el.style.getPropertyValue('--target-width');
     });
   });
 }
