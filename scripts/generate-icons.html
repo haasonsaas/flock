@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Flock Icon Generator</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      max-width: 600px;
+      margin: 40px auto;
+      padding: 20px;
+      background: #1a1a1a;
+      color: #fff;
+    }
+    h1 { color: #F59E0B; }
+    .icon-preview {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      margin: 20px 0;
+    }
+    .icon-item {
+      text-align: center;
+    }
+    .icon-item canvas {
+      border: 1px solid #333;
+      border-radius: 8px;
+    }
+    .icon-item p {
+      margin-top: 8px;
+      font-size: 12px;
+      color: #888;
+    }
+    button {
+      background: #F59E0B;
+      color: #000;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 20px;
+    }
+    button:hover {
+      background: #D97706;
+    }
+    .instructions {
+      background: #222;
+      padding: 16px;
+      border-radius: 8px;
+      margin-top: 20px;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+  <h1>Flock Icon Generator</h1>
+  <p>Generate PNG icons for the Chrome extension</p>
+
+  <div class="icon-preview" id="preview"></div>
+
+  <button onclick="downloadAll()">Download All Icons</button>
+
+  <div class="instructions">
+    <strong>Instructions:</strong><br>
+    1. Click "Download All Icons" to save each icon<br>
+    2. Move the downloaded files to the <code>assets/</code> folder<br>
+    3. Rename them to match the manifest (icon-16.png, icon-32.png, etc.)
+  </div>
+
+  <script>
+    const sizes = [16, 32, 48, 128];
+
+    function drawIcon(ctx, size) {
+      // Background with gradient
+      const gradient = ctx.createLinearGradient(0, 0, size, size);
+      gradient.addColorStop(0, '#F59E0B');
+      gradient.addColorStop(1, '#D97706');
+
+      // Rounded rectangle
+      const radius = size * 0.22;
+      ctx.beginPath();
+      ctx.moveTo(radius, 0);
+      ctx.lineTo(size - radius, 0);
+      ctx.quadraticCurveTo(size, 0, size, radius);
+      ctx.lineTo(size, size - radius);
+      ctx.quadraticCurveTo(size, size, size - radius, size);
+      ctx.lineTo(radius, size);
+      ctx.quadraticCurveTo(0, size, 0, size - radius);
+      ctx.lineTo(0, radius);
+      ctx.quadraticCurveTo(0, 0, radius, 0);
+      ctx.closePath();
+      ctx.fillStyle = gradient;
+      ctx.fill();
+
+      // Bird icon (simplified for small sizes)
+      ctx.fillStyle = '#000000';
+      const scale = size / 128;
+      ctx.save();
+      ctx.scale(scale, scale);
+
+      // Draw bird path
+      ctx.beginPath();
+      ctx.moveTo(98, 38);
+      ctx.bezierCurveTo(96, 40, 92, 42, 86, 44);
+      ctx.bezierCurveTo(88, 50, 88, 56, 86, 62);
+      ctx.bezierCurveTo(84, 68, 80, 74, 74, 80);
+      ctx.bezierCurveTo(68, 86, 60, 90, 50, 92);
+      ctx.bezierCurveTo(40, 94, 30, 94, 20, 90);
+      ctx.bezierCurveTo(28, 90, 34, 88, 40, 84);
+      ctx.bezierCurveTo(34, 84, 30, 82, 26, 78);
+      ctx.bezierCurveTo(30, 78, 34, 76, 36, 74);
+      ctx.bezierCurveTo(30, 72, 26, 68, 24, 64);
+      ctx.bezierCurveTo(28, 66, 32, 66, 34, 66);
+      ctx.bezierCurveTo(28, 60, 26, 54, 26, 46);
+      ctx.bezierCurveTo(28, 48, 32, 48, 34, 48);
+      ctx.bezierCurveTo(28, 44, 26, 38, 26, 30);
+      ctx.bezierCurveTo(26, 28, 26, 26, 28, 24);
+      ctx.bezierCurveTo(36, 34, 46, 40, 60, 42);
+      ctx.bezierCurveTo(60, 40, 58, 38, 58, 36);
+      ctx.bezierCurveTo(58, 28, 64, 22, 72, 22);
+      ctx.bezierCurveTo(76, 22, 80, 24, 82, 26);
+      ctx.bezierCurveTo(86, 24, 90, 24, 92, 22);
+      ctx.bezierCurveTo(90, 26, 90, 30, 86, 32);
+      ctx.bezierCurveTo(90, 32, 94, 30, 96, 30);
+      ctx.bezierCurveTo(94, 34, 92, 36, 88, 38);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    // Generate previews
+    const preview = document.getElementById('preview');
+
+    sizes.forEach(size => {
+      const div = document.createElement('div');
+      div.className = 'icon-item';
+
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      canvas.id = `icon-${size}`;
+
+      const ctx = canvas.getContext('2d');
+      drawIcon(ctx, size);
+
+      div.appendChild(canvas);
+      div.innerHTML += `<p>${size}x${size}</p>`;
+      preview.appendChild(div);
+    });
+
+    function downloadAll() {
+      sizes.forEach(size => {
+        const canvas = document.getElementById(`icon-${size}`);
+        const link = document.createElement('a');
+        link.download = `icon-${size}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+      });
+    }
+  </script>
+</body>
+</html>

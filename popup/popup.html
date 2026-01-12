@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flock - Twitter CRM</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="flock-app">
+    <!-- Header -->
+    <header class="flock-header">
+      <div class="flock-logo">
+        <svg viewBox="0 0 24 24" class="flock-logo-icon">
+          <path d="M21.5 6.5c-.5.5-1.5 1-3 1.5.5 1.5.5 3 0 4.5-.5 1.5-1.5 3-3 4.5-1.5 1.5-3.5 2.5-6 3-2.5.5-5 .5-7.5-.5 2 0 3.5-.5 5-1.5-1.5 0-2.5-.5-3.5-1.5 1 0 2-.5 2.5-1-1.5-.5-2.5-1.5-3-2.5 1 .5 2 .5 2.5.5C4 12 3 10.5 3 8.5c.5.5 1.5.5 2 .5-1.5-1-2-2.5-2-4.5 0-.5 0-1 .5-1.5 2 2.5 4.5 4 8 4.5 0-.5-.5-1-.5-1.5 0-2 1.5-3.5 3.5-3.5 1 0 2 .5 2.5 1 1-.5 2-.5 2.5-1-.5 1-.5 2-1.5 2.5 1 0 2-.5 2.5-.5-.5 1-1 1.5-2 2z" fill="currentColor"/>
+        </svg>
+        <span class="flock-logo-text">Flock</span>
+      </div>
+      <div class="flock-header-actions">
+        <button class="flock-icon-btn" id="searchBtn" title="Search">
+          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2" fill="none"/><path d="M21 21l-4.5-4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
+        </button>
+        <button class="flock-icon-btn" id="settingsBtn" title="Settings">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2" fill="none"/><path d="M12 1v4m0 14v4M4.22 4.22l2.83 2.83m9.9 9.9l2.83 2.83M1 12h4m14 0h4M4.22 19.78l2.83-2.83m9.9-9.9l2.83-2.83" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Search Bar (hidden by default) -->
+    <div class="flock-search-bar" id="searchBar">
+      <input type="text" class="flock-search-input" id="searchInput" placeholder="Search contacts...">
+    </div>
+
+    <!-- Stats -->
+    <div class="flock-stats">
+      <div class="flock-stat-card">
+        <div class="flock-stat-value" id="totalContacts">0</div>
+        <div class="flock-stat-label">Contacts</div>
+      </div>
+      <div class="flock-stat-card">
+        <div class="flock-stat-value" id="thisWeek">0</div>
+        <div class="flock-stat-label">This Week</div>
+      </div>
+      <div class="flock-stat-card">
+        <div class="flock-stat-value" id="needsFollowUp">0</div>
+        <div class="flock-stat-label">Follow-ups</div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="flock-tabs">
+      <button class="flock-tab flock-active" data-tab="all">All</button>
+      <button class="flock-tab" data-tab="pipeline">Pipeline</button>
+      <button class="flock-tab" data-tab="recent">Recent</button>
+    </div>
+
+    <!-- Contact List -->
+    <div class="flock-content">
+      <div class="flock-contact-list" id="contactList">
+        <!-- Contacts will be rendered here -->
+      </div>
+
+      <!-- Pipeline View -->
+      <div class="flock-pipeline-view" id="pipelineView" style="display: none;">
+        <!-- Pipeline columns will be rendered here -->
+      </div>
+
+      <!-- Empty State -->
+      <div class="flock-empty-state" id="emptyState" style="display: none;">
+        <svg viewBox="0 0 24 24" class="flock-empty-icon">
+          <circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="2" fill="none"/>
+          <path d="M4 20c0-4 4-6 8-6s8 2 8 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/>
+        </svg>
+        <p class="flock-empty-text">No contacts saved yet</p>
+        <p class="flock-empty-subtext">Visit a Twitter profile and click "Save to Flock" to get started</p>
+      </div>
+
+      <!-- Loading State -->
+      <div class="flock-loading-state" id="loadingState">
+        <div class="flock-spinner"></div>
+        <p>Loading...</p>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="flock-footer">
+      <button class="flock-footer-btn" id="exportBtn">
+        <svg viewBox="0 0 24 24"><path d="M12 3v12m-5-5l5 5 5-5M5 21h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+        Export
+      </button>
+      <span class="flock-footer-divider"></span>
+      <span class="flock-footer-version">v1.0.0</span>
+    </footer>
+  </div>
+
+  <script src="popup.js" type="module"></script>
+</body>
+</html>

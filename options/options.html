@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flock Settings</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <div class="flock-options">
+    <header class="flock-options-header">
+      <div class="flock-logo">
+        <svg viewBox="0 0 24 24" class="flock-logo-icon">
+          <path d="M21.5 6.5c-.5.5-1.5 1-3 1.5.5 1.5.5 3 0 4.5-.5 1.5-1.5 3-3 4.5-1.5 1.5-3.5 2.5-6 3-2.5.5-5 .5-7.5-.5 2 0 3.5-.5 5-1.5-1.5 0-2.5-.5-3.5-1.5 1 0 2-.5 2.5-1-1.5-.5-2.5-1.5-3-2.5 1 .5 2 .5 2.5.5C4 12 3 10.5 3 8.5c.5.5 1.5.5 2 .5-1.5-1-2-2.5-2-4.5 0-.5 0-1 .5-1.5 2 2.5 4.5 4 8 4.5 0-.5-.5-1-.5-1.5 0-2 1.5-3.5 3.5-3.5 1 0 2 .5 2.5 1 1-.5 2-.5 2.5-1-.5 1-.5 2-1.5 2.5 1 0 2-.5 2.5-.5-.5 1-1 1.5-2 2z" fill="currentColor"/>
+        </svg>
+        <div class="flock-logo-text">
+          <span class="flock-title">Flock</span>
+          <span class="flock-subtitle">Twitter CRM Settings</span>
+        </div>
+      </div>
+    </header>
+
+    <main class="flock-options-main">
+      <!-- Data Management -->
+      <section class="flock-section">
+        <h2 class="flock-section-title">Data Management</h2>
+
+        <div class="flock-option-group">
+          <div class="flock-option">
+            <div class="flock-option-info">
+              <h3 class="flock-option-title">Export Data</h3>
+              <p class="flock-option-desc">Download all your contacts and interactions as a JSON file</p>
+            </div>
+            <button class="flock-btn flock-btn-secondary" id="exportBtn">
+              <svg viewBox="0 0 24 24"><path d="M12 3v12m-5-5l5 5 5-5M5 21h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+              Export
+            </button>
+          </div>
+
+          <div class="flock-option">
+            <div class="flock-option-info">
+              <h3 class="flock-option-title">Import Data</h3>
+              <p class="flock-option-desc">Restore contacts from a previously exported JSON file</p>
+            </div>
+            <label class="flock-btn flock-btn-secondary">
+              <svg viewBox="0 0 24 24"><path d="M12 21v-12m-5 5l5-5 5 5M5 3h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+              Import
+              <input type="file" id="importInput" accept=".json" style="display: none;">
+            </label>
+          </div>
+
+          <div class="flock-option flock-option-danger">
+            <div class="flock-option-info">
+              <h3 class="flock-option-title">Clear All Data</h3>
+              <p class="flock-option-desc">Permanently delete all contacts and interactions</p>
+            </div>
+            <button class="flock-btn flock-btn-danger" id="clearBtn">
+              <svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2m3 0v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6h14z" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
+              Clear Data
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Pipeline Stages -->
+      <section class="flock-section">
+        <h2 class="flock-section-title">Pipeline Stages</h2>
+        <p class="flock-section-desc">Customize your sales pipeline stages</p>
+
+        <div class="flock-stages-list" id="stagesList">
+          <div class="flock-stage-item">
+            <span class="flock-stage-color" style="background: #3B82F6;"></span>
+            <span class="flock-stage-name">New</span>
+          </div>
+          <div class="flock-stage-item">
+            <span class="flock-stage-color" style="background: #8B5CF6;"></span>
+            <span class="flock-stage-name">Contacted</span>
+          </div>
+          <div class="flock-stage-item">
+            <span class="flock-stage-color" style="background: #F59E0B;"></span>
+            <span class="flock-stage-name">Engaged</span>
+          </div>
+          <div class="flock-stage-item">
+            <span class="flock-stage-color" style="background: #10B981;"></span>
+            <span class="flock-stage-name">Qualified</span>
+          </div>
+          <div class="flock-stage-item">
+            <span class="flock-stage-color" style="background: #10B981;"></span>
+            <span class="flock-stage-name">Won</span>
+          </div>
+          <div class="flock-stage-item">
+            <span class="flock-stage-color" style="background: #EF4444;"></span>
+            <span class="flock-stage-name">Lost</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- About -->
+      <section class="flock-section">
+        <h2 class="flock-section-title">About</h2>
+
+        <div class="flock-about">
+          <div class="flock-about-row">
+            <span class="flock-about-label">Version</span>
+            <span class="flock-about-value">1.0.0</span>
+          </div>
+          <div class="flock-about-row">
+            <span class="flock-about-label">Storage</span>
+            <span class="flock-about-value" id="storageUsed">Calculating...</span>
+          </div>
+          <div class="flock-about-row">
+            <span class="flock-about-label">Contacts</span>
+            <span class="flock-about-value" id="contactCount">0</span>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="flock-options-footer">
+      <p>Built with care for Twitter power users</p>
+    </footer>
+  </div>
+
+  <!-- Toast container -->
+  <div class="flock-toast-container" id="toastContainer"></div>
+
+  <script src="options.js" type="module"></script>
+</body>
+</html>
