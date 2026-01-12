@@ -19,6 +19,17 @@ async function getContact(username) {
   return contactsObj[username] || null;
 }
 
+async function updateContact(username, updates) {
+  const result = await chrome.storage.local.get('contacts');
+  const contactsObj = result.contacts || {};
+  if (contactsObj[username]) {
+    contactsObj[username] = { ...contactsObj[username], ...updates, updatedAt: Date.now() };
+    await chrome.storage.local.set({ contacts: contactsObj });
+    return contactsObj[username];
+  }
+  return null;
+}
+
 async function getAllInteractions() {
   const result = await chrome.storage.local.get('interactions');
   return result.interactions || {};
@@ -87,6 +98,59 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
+function getRelationshipStrength(contact, interactions) {
+  // Calculate based on recency and frequency of interactions
+  const contactInteractions = Object.values(interactions).filter(i => i.username === contact.username);
+  const now = Date.now();
+  const weekAgo = now - (7 * 24 * 60 * 60 * 1000);
+  const monthAgo = now - (30 * 24 * 60 * 60 * 1000);
+
+  // Count recent interactions
+  const thisWeek = contactInteractions.filter(i => i.timestamp >= weekAgo).length;
+  const thisMonth = contactInteractions.filter(i => i.timestamp >= monthAgo).length;
+
+  // Score: 0-100
+  let score = 0;
+  score += Math.min(thisWeek * 15, 45); // Up to 45 points for this week
+  score += Math.min(thisMonth * 5, 30);  // Up to 30 points for this month
+  score += contactInteractions.length > 0 ? 15 : 0; // 15 points for any history
+  score += contact.notes ? 10 : 0; // 10 points for having notes
+
+  return Math.min(score, 100);
+}
+
+function getStaleContacts(contacts, interactions, limit = 3) {
+  const now = Date.now();
+  const weekAgo = now - (7 * 24 * 60 * 60 * 1000);
+
+  return contacts
+    .filter(c => {
+      // Has been saved for at least 2 days
+      if (c.createdAt > now - (2 * 24 * 60 * 60 * 1000)) return false;
+      // No recent interaction
+      const lastInteraction = c.lastInteraction || 0;
+      return lastInteraction < weekAgo;
+    })
+    .sort((a, b) => (a.lastInteraction || 0) - (b.lastInteraction || 0))
+    .slice(0, limit);
+}
+
+function showToast(message, type = 'success') {
+  // Remove existing toast
+  const existing = document.querySelector('.flock-toast');
+  if (existing) existing.remove();
+
+  const toast = document.createElement('div');
+  toast.className = `flock-toast flock-toast-${type}`;
+  toast.textContent = message;
+  document.body.appendChild(toast);
+
+  setTimeout(() => {
+    toast.classList.add('flock-toast-hide');
+    setTimeout(() => toast.remove(), 200);
+  }, 2000);
+}
+
 // ================================
 // ICONS
 // ================================
@@ -113,32 +177,89 @@ function renderContactCard(contact, interactions = {}) {
   const lastInteraction = contactInteractions.length > 0
     ? Math.max(...contactInteractions.map(i => i.timestamp))
     : contact.lastInteraction;
+  const strength = getRelationshipStrength(contact, interactions);
+  const strengthClass = strength >= 60 ? 'strong' : strength >= 30 ? 'medium' : 'weak';
 
   return `
     <div class="flock-contact-card" data-username="${escapeHtml(contact.username)}">
-      <img
-        class="flock-contact-avatar"
-        src="${escapeHtml(contact.profileImageUrl || '')}"
-        alt="${escapeHtml(contact.displayName)}"
-        onerror="this.style.display='none'"
-      >
+      <div class="flock-avatar-wrap">
+        <img
+          class="flock-contact-avatar"
+          src="${escapeHtml(contact.profileImageUrl || '')}"
+          alt="${escapeHtml(contact.displayName)}"
+          onerror="this.style.display='none'"
+        >
+        <div class="flock-strength-ring flock-strength-${strengthClass}" title="Relationship: ${strength}%">
+          <svg viewBox="0 0 36 36">
+            <circle cx="18" cy="18" r="16" fill="none" stroke="currentColor" stroke-opacity="0.2" stroke-width="3"/>
+            <circle cx="18" cy="18" r="16" fill="none" stroke="currentColor" stroke-width="3"
+              stroke-dasharray="${strength} 100" stroke-linecap="round" transform="rotate(-90 18 18)"/>
+          </svg>
+        </div>
+      </div>
       <div class="flock-contact-info">
         <div class="flock-contact-name">${escapeHtml(contact.displayName || contact.username)}</div>
         <div class="flock-contact-username">@${escapeHtml(contact.username)}</div>
         <div class="flock-contact-meta">
-          <span class="flock-contact-stage stage-${contact.pipelineStage || 'new'}">
-            ${contact.pipelineStage || 'new'}
-          </span>
+          <div class="flock-stage-quick" data-username="${escapeHtml(contact.username)}">
+            <span class="flock-contact-stage stage-${contact.pipelineStage || 'new'}">
+              ${contact.pipelineStage || 'new'}
+            </span>
+            <svg class="flock-stage-chevron" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+            <div class="flock-stage-dropdown">
+              ${['new', 'contacted', 'engaged', 'qualified', 'won', 'lost'].map(stage => `
+                <button class="flock-stage-option ${stage === (contact.pipelineStage || 'new') ? 'active' : ''}" data-stage="${stage}">${stage}</button>
+              `).join('')}
+            </div>
+          </div>
           ${lastInteraction ? `<span class="flock-contact-time">${timeAgo(lastInteraction)}</span>` : ''}
         </div>
       </div>
       <div class="flock-contact-actions">
-        <button class="flock-contact-action flock-action-detail" title="View details" data-action="detail" data-username="${escapeHtml(contact.username)}">
-          <svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+        <button class="flock-contact-action flock-action-twitter" title="Open on Twitter" data-action="twitter" data-username="${escapeHtml(contact.username)}">
+          ${Icons.external}
         </button>
       </div>
     </div>
   `;
+}
+
+function renderSuggestions(contacts, interactions) {
+  const container = document.getElementById('suggestionsBar');
+  if (!container) return;
+
+  const staleContacts = getStaleContacts(contacts, interactions, 3);
+
+  if (staleContacts.length === 0) {
+    container.style.display = 'none';
+    return;
+  }
+
+  container.style.display = 'block';
+  container.innerHTML = `
+    <div class="flock-suggestions">
+      <div class="flock-suggestions-header">
+        <span class="flock-suggestions-icon">💭</span>
+        <span>Reconnect with</span>
+      </div>
+      <div class="flock-suggestions-list">
+        ${staleContacts.map(c => `
+          <button class="flock-suggestion-chip" data-username="${escapeHtml(c.username)}">
+            <img src="${escapeHtml(c.profileImageUrl || '')}" onerror="this.style.display='none'">
+            <span>${escapeHtml(c.displayName || c.username)}</span>
+          </button>
+        `).join('')}
+      </div>
+    </div>
+  `;
+
+  // Add click handlers
+  container.querySelectorAll('.flock-suggestion-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const username = chip.dataset.username;
+      openTwitterProfile(username);
+    });
+  });
 }
 
 function renderContactList(contacts, interactions = {}) {
@@ -177,22 +298,70 @@ function renderContactList(contacts, interactions = {}) {
   container.style.display = 'flex';
   container.innerHTML = contacts.map(c => renderContactCard(c, interactions)).join('');
 
-  // Add click handlers
+  // Add click handlers for cards
   container.querySelectorAll('.flock-contact-card').forEach(card => {
     card.addEventListener('click', (e) => {
-      if (e.target.closest('.flock-contact-action')) return;
+      if (e.target.closest('.flock-contact-action') || e.target.closest('.flock-stage-quick')) return;
       const username = card.dataset.username;
       showContactDetail(username);
     });
   });
 
-  container.querySelectorAll('.flock-contact-action[data-action="detail"]').forEach(btn => {
+  // Quick stage dropdown handlers
+  container.querySelectorAll('.flock-stage-quick').forEach(quick => {
+    quick.addEventListener('click', (e) => {
+      e.stopPropagation();
+      // Close other dropdowns
+      container.querySelectorAll('.flock-stage-quick.open').forEach(other => {
+        if (other !== quick) other.classList.remove('open');
+      });
+      quick.classList.toggle('open');
+    });
+  });
+
+  // Stage option handlers
+  container.querySelectorAll('.flock-stage-option').forEach(option => {
+    option.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const stage = option.dataset.stage;
+      const quick = option.closest('.flock-stage-quick');
+      const username = quick.dataset.username;
+
+      await updateContact(username, { pipelineStage: stage });
+      quick.classList.remove('open');
+
+      // Update the display
+      const stageSpan = quick.querySelector('.flock-contact-stage');
+      stageSpan.className = `flock-contact-stage stage-${stage}`;
+      stageSpan.textContent = stage;
+
+      // Update active state
+      quick.querySelectorAll('.flock-stage-option').forEach(opt => {
+        opt.classList.toggle('active', opt.dataset.stage === stage);
+      });
+
+      // Refresh data
+      allContacts = await getAllContacts();
+      updateStats(allContacts);
+      showToast(`Moved to ${stage}`);
+    });
+  });
+
+  // Twitter button handlers
+  container.querySelectorAll('.flock-contact-action[data-action="twitter"]').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       const username = btn.dataset.username;
-      showContactDetail(username);
+      openTwitterProfile(username);
     });
   });
+
+  // Close dropdowns when clicking elsewhere
+  document.addEventListener('click', () => {
+    container.querySelectorAll('.flock-stage-quick.open').forEach(quick => {
+      quick.classList.remove('open');
+    });
+  }, { once: true });
 }
 
 async function showContactDetail(username) {
@@ -281,6 +450,24 @@ async function showContactDetail(username) {
   // Event handlers
   document.getElementById('backBtn').addEventListener('click', hideContactDetail);
   panel.querySelector('.flock-open-profile').addEventListener('click', () => openTwitterProfile(username));
+
+  // Stage pill handlers
+  panel.querySelectorAll('.flock-stage-pill').forEach(pill => {
+    pill.addEventListener('click', async () => {
+      const stage = pill.dataset.stage;
+      await updateContact(username, { pipelineStage: stage });
+
+      // Update UI
+      panel.querySelectorAll('.flock-stage-pill').forEach(p => {
+        p.classList.toggle('active', p.dataset.stage === stage);
+      });
+
+      // Refresh data
+      allContacts = await getAllContacts();
+      updateStats(allContacts);
+      showToast(`Moved to ${stage}`);
+    });
+  });
 }
 
 function hideContactDetail() {
@@ -623,6 +810,9 @@ async function init() {
 
     // Update stats
     updateStats(allContacts);
+
+    // Render suggestions
+    renderSuggestions(allContacts, allInteractions);
 
     // Render initial view
     await switchTab('all');
