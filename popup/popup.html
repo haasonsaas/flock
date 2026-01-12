@@ -17,8 +17,11 @@
         <span class="flock-logo-text">Flock</span>
       </div>
       <div class="flock-header-actions">
-        <button class="flock-icon-btn" id="searchBtn" title="Search">
+        <button class="flock-icon-btn" id="searchBtn" title="Search (/)">
           <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2" fill="none"/><path d="M21 21l-4.5-4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
+        </button>
+        <button class="flock-icon-btn" id="helpBtn" title="Keyboard shortcuts (?)">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none"/><path d="M9 9a3 3 0 015.12-2.13A3 3 0 0112 12v1" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/><circle cx="12" cy="17" r="1" fill="currentColor"/></svg>
         </button>
         <button class="flock-icon-btn" id="settingsBtn" title="Settings">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -28,20 +31,20 @@
 
     <!-- Search Bar (hidden by default) -->
     <div class="flock-search-bar" id="searchBar">
-      <input type="text" class="flock-search-input" id="searchInput" placeholder="Search contacts...">
+      <input type="text" class="flock-search-input" id="searchInput" placeholder="Search contacts, tags, notes...">
     </div>
 
     <!-- Stats -->
     <div class="flock-stats">
-      <div class="flock-stat-card">
+      <div class="flock-stat-card" data-filter="all">
         <div class="flock-stat-value" id="totalContacts">0</div>
         <div class="flock-stat-label">Contacts</div>
       </div>
-      <div class="flock-stat-card">
+      <div class="flock-stat-card" data-filter="recent">
         <div class="flock-stat-value" id="thisWeek">0</div>
         <div class="flock-stat-label">This Week</div>
       </div>
-      <div class="flock-stat-card">
+      <div class="flock-stat-card flock-stat-clickable" data-filter="followup">
         <div class="flock-stat-value" id="needsFollowUp">0</div>
         <div class="flock-stat-label">Follow-ups</div>
       </div>
@@ -50,14 +53,39 @@
     <!-- Tabs -->
     <div class="flock-tabs">
       <button class="flock-tab flock-active" data-tab="all">All</button>
+      <button class="flock-tab" data-tab="activity">Activity</button>
       <button class="flock-tab" data-tab="pipeline">Pipeline</button>
-      <button class="flock-tab" data-tab="recent">Recent</button>
     </div>
 
-    <!-- Contact List -->
+    <!-- Filter Bar -->
+    <div class="flock-filter-bar" id="filterBar">
+      <select class="flock-filter-select" id="stageFilter">
+        <option value="">All stages</option>
+        <option value="new">New</option>
+        <option value="contacted">Contacted</option>
+        <option value="engaged">Engaged</option>
+        <option value="qualified">Qualified</option>
+        <option value="won">Won</option>
+        <option value="lost">Lost</option>
+      </select>
+      <select class="flock-filter-select" id="sortBy">
+        <option value="recent">Recently added</option>
+        <option value="name">Name A-Z</option>
+        <option value="followers">Most followers</option>
+        <option value="interaction">Last interaction</option>
+      </select>
+    </div>
+
+    <!-- Content Area -->
     <div class="flock-content">
+      <!-- Contact List -->
       <div class="flock-contact-list" id="contactList">
         <!-- Contacts will be rendered here -->
+      </div>
+
+      <!-- Activity Feed -->
+      <div class="flock-activity-feed" id="activityFeed" style="display: none;">
+        <!-- Activity items will be rendered here -->
       </div>
 
       <!-- Pipeline View -->
@@ -65,14 +93,35 @@
         <!-- Pipeline columns will be rendered here -->
       </div>
 
+      <!-- Contact Detail Panel -->
+      <div class="flock-detail-panel" id="detailPanel" style="display: none;">
+        <!-- Contact details will be rendered here -->
+      </div>
+
       <!-- Empty State -->
       <div class="flock-empty-state" id="emptyState" style="display: none;">
-        <svg viewBox="0 0 24 24" class="flock-empty-icon">
-          <circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="2" fill="none"/>
-          <path d="M4 20c0-4 4-6 8-6s8 2 8 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/>
-        </svg>
-        <p class="flock-empty-text">No contacts saved yet</p>
-        <p class="flock-empty-subtext">Visit a Twitter profile and click "Save to Flock" to get started</p>
+        <div class="flock-empty-icon-wrap">
+          <svg viewBox="0 0 24 24" class="flock-empty-icon">
+            <circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="2" fill="none"/>
+            <path d="M4 20c0-4 4-6 8-6s8 2 8 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/>
+          </svg>
+        </div>
+        <p class="flock-empty-text">No contacts yet</p>
+        <p class="flock-empty-subtext">Visit any Twitter profile and press <kbd>Cmd+Shift+S</kbd> to save your first contact</p>
+        <div class="flock-empty-steps">
+          <div class="flock-empty-step">
+            <span class="flock-step-num">1</span>
+            <span>Go to a Twitter profile</span>
+          </div>
+          <div class="flock-empty-step">
+            <span class="flock-step-num">2</span>
+            <span>Press <kbd>Cmd+Shift+S</kbd> or click the Flock button</span>
+          </div>
+          <div class="flock-empty-step">
+            <span class="flock-step-num">3</span>
+            <span>Add notes and track your relationship</span>
+          </div>
+        </div>
       </div>
 
       <!-- Loading State -->
@@ -91,6 +140,48 @@
       <span class="flock-footer-divider"></span>
       <span class="flock-footer-version">v1.0.0</span>
     </footer>
+  </div>
+
+  <!-- Keyboard Shortcuts Modal -->
+  <div class="flock-modal-overlay" id="helpModal" style="display: none;">
+    <div class="flock-modal">
+      <div class="flock-modal-header">
+        <h3>Keyboard Shortcuts</h3>
+        <button class="flock-modal-close" id="closeHelp">&times;</button>
+      </div>
+      <div class="flock-modal-body">
+        <div class="flock-shortcut-section">
+          <h4>On Twitter</h4>
+          <div class="flock-shortcut">
+            <span class="flock-shortcut-keys"><kbd>Cmd</kbd><kbd>Shift</kbd><kbd>S</kbd></span>
+            <span class="flock-shortcut-desc">Save current profile to Flock</span>
+          </div>
+          <div class="flock-shortcut">
+            <span class="flock-shortcut-keys"><kbd>Cmd</kbd><kbd>Shift</kbd><kbd>F</kbd></span>
+            <span class="flock-shortcut-desc">Open/close Flock sidebar</span>
+          </div>
+          <div class="flock-shortcut">
+            <span class="flock-shortcut-keys"><kbd>Cmd</kbd><kbd>Shift</kbd><kbd>T</kbd></span>
+            <span class="flock-shortcut-desc">Open DM templates</span>
+          </div>
+        </div>
+        <div class="flock-shortcut-section">
+          <h4>In This Popup</h4>
+          <div class="flock-shortcut">
+            <span class="flock-shortcut-keys"><kbd>/</kbd></span>
+            <span class="flock-shortcut-desc">Focus search</span>
+          </div>
+          <div class="flock-shortcut">
+            <span class="flock-shortcut-keys"><kbd>?</kbd></span>
+            <span class="flock-shortcut-desc">Show this help</span>
+          </div>
+          <div class="flock-shortcut">
+            <span class="flock-shortcut-keys"><kbd>Esc</kbd></span>
+            <span class="flock-shortcut-desc">Close panels/modals</span>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script src="popup.js" type="module"></script>
