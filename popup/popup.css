@@ -3651,3 +3651,194 @@ body::before {
   color: var(--flock-text-tertiary);
   text-align: center;
 }
+
+/* ================================
+   OFFLINE & ERROR STATES
+   ================================ */
+
+/* Offline Banner */
+.flock-offline-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: linear-gradient(90deg,
+    rgba(239, 68, 68, 0.15) 0%,
+    rgba(239, 68, 68, 0.1) 50%,
+    rgba(239, 68, 68, 0.15) 100%);
+  border-bottom: 1px solid var(--flock-error);
+  font-family: var(--flock-font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--flock-error);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  animation: flock-pulse-error 2s ease-in-out infinite;
+}
+
+.flock-offline-icon {
+  width: 14px;
+  height: 14px;
+  color: var(--flock-error);
+}
+
+@keyframes flock-pulse-error {
+  0%, 100% { opacity: 0.8; }
+  50% { opacity: 1; }
+}
+
+/* Error Toast */
+.flock-toast {
+  position: fixed;
+  bottom: 60px;
+  left: 50%;
+  transform: translateX(-50%) translateY(100px);
+  padding: 10px 16px;
+  background: var(--flock-bg-secondary);
+  border: 1px solid var(--flock-border);
+  border-radius: 2px;
+  font-family: var(--flock-font-mono);
+  font-size: 11px;
+  color: var(--flock-text-primary);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  z-index: 1001;
+  opacity: 0;
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+.flock-toast.flock-toast-visible {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+}
+
+.flock-toast-error {
+  border-color: var(--flock-error);
+  box-shadow: 0 0 15px rgba(239, 68, 68, 0.3), 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+.flock-toast-error::before {
+  content: '⚠ ERROR: ';
+  color: var(--flock-error);
+  font-weight: 700;
+}
+
+.flock-toast-success {
+  border-color: var(--flock-success);
+  box-shadow: 0 0 15px rgba(16, 185, 129, 0.3), 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+.flock-toast-success::before {
+  content: '✓ ';
+  color: var(--flock-success);
+  font-weight: 700;
+}
+
+.flock-toast-warning {
+  border-color: var(--flock-warning);
+  box-shadow: 0 0 15px rgba(245, 158, 11, 0.3), 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+.flock-toast-warning::before {
+  content: '! ';
+  color: var(--flock-warning);
+  font-weight: 700;
+}
+
+/* Loading State - Terminal Style */
+.flock-loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 40px 20px;
+  color: var(--flock-text-secondary);
+}
+
+.flock-loading-state p {
+  font-family: var(--flock-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--flock-amber);
+  animation: flock-blink 1s step-end infinite;
+}
+
+.flock-spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--flock-border);
+  border-top-color: var(--flock-amber);
+  border-radius: 50%;
+  animation: flock-spin 0.8s linear infinite;
+  box-shadow: 0 0 10px var(--flock-amber-glow);
+}
+
+@keyframes flock-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes flock-blink {
+  50% { opacity: 0.5; }
+}
+
+/* Error State in Loading */
+.flock-loading-state.flock-error-state p {
+  color: var(--flock-error);
+  animation: none;
+}
+
+.flock-loading-state.flock-error-state .flock-spinner {
+  display: none;
+}
+
+.flock-error-icon {
+  width: 32px;
+  height: 32px;
+  color: var(--flock-error);
+  animation: flock-pulse-error 2s ease-in-out infinite;
+}
+
+.flock-retry-btn {
+  margin-top: 8px;
+  padding: 8px 16px;
+  background: transparent;
+  border: 1px solid var(--flock-error);
+  border-radius: 2px;
+  font-family: var(--flock-font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--flock-error);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: all var(--flock-transition);
+}
+
+.flock-retry-btn:hover {
+  background: rgba(239, 68, 68, 0.1);
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
+}
+
+/* Inline Loading Indicator */
+.flock-loading-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--flock-font-mono);
+  font-size: 10px;
+  color: var(--flock-text-tertiary);
+}
+
+.flock-loading-dots::after {
+  content: '';
+  animation: flock-dots 1.5s steps(4, end) infinite;
+}
+
+@keyframes flock-dots {
+  0% { content: ''; }
+  25% { content: '.'; }
+  50% { content: '..'; }
+  75% { content: '...'; }
+}

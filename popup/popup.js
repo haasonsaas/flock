@@ -165,6 +165,127 @@ async function exportData() {
 }
 
 // ================================
+// ERROR HANDLING & TOASTS
+// ================================
+
+const Toast = {
+  container: null,
+  timeout: null,
+
+  init() {
+    // Create toast container if it doesn't exist
+    if (!this.container) {
+      this.container = document.createElement('div');
+      this.container.className = 'flock-toast';
+      document.body.appendChild(this.container);
+    }
+  },
+
+  show(message, type = 'info', duration = 3000) {
+    this.init();
+
+    // Clear existing timeout
+    if (this.timeout) {
+      clearTimeout(this.timeout);
+    }
+
+    // Reset classes
+    this.container.className = 'flock-toast';
+    if (type !== 'info') {
+      this.container.classList.add(`flock-toast-${type}`);
+    }
+
+    this.container.textContent = message;
+
+    // Show toast
+    requestAnimationFrame(() => {
+      this.container.classList.add('flock-toast-visible');
+    });
+
+    // Auto-hide
+    this.timeout = setTimeout(() => this.hide(), duration);
+  },
+
+  hide() {
+    if (this.container) {
+      this.container.classList.remove('flock-toast-visible');
+    }
+  },
+
+  error(message) {
+    this.show(message, 'error', 5000);
+  },
+
+  success(message) {
+    this.show(message, 'success', 3000);
+  },
+
+  warning(message) {
+    this.show(message, 'warning', 4000);
+  }
+};
+
+// Offline detection
+const OfflineHandler = {
+  isOnline: navigator.onLine,
+  banner: null,
+
+  init() {
+    this.banner = document.getElementById('offlineBanner');
+
+    window.addEventListener('online', () => {
+      this.isOnline = true;
+      this.updateBanner();
+      Toast.success('Connection restored');
+    });
+
+    window.addEventListener('offline', () => {
+      this.isOnline = false;
+      this.updateBanner();
+    });
+
+    // Initial state
+    this.updateBanner();
+  },
+
+  updateBanner() {
+    if (this.banner) {
+      this.banner.style.display = this.isOnline ? 'none' : 'flex';
+    }
+  }
+};
+
+// Safe async wrapper with error handling
+async function safeAsync(fn, errorMessage = 'Operation failed') {
+  try {
+    return await fn();
+  } catch (error) {
+    console.error(`[Flock] ${errorMessage}:`, error);
+    Toast.error(errorMessage);
+    return null;
+  }
+}
+
+// Show error state in loading div
+function showErrorState(message, retryFn = null) {
+  const loadingState = document.getElementById('loadingState');
+  loadingState.classList.add('flock-error-state');
+  loadingState.innerHTML = `
+    <svg viewBox="0 0 24 24" class="flock-error-icon">
+      <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none"/>
+      <path d="M12 8v4M12 16h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/>
+    </svg>
+    <p>${message}</p>
+    ${retryFn ? '<button class="flock-retry-btn" id="retryBtn">Retry</button>' : ''}
+  `;
+  loadingState.style.display = 'flex';
+
+  if (retryFn) {
+    document.getElementById('retryBtn')?.addEventListener('click', retryFn);
+  }
+}
+
+// ================================
 // LISTS STORAGE
 // ================================
 
@@ -330,7 +451,7 @@ function getRelationshipStrength(contact, interactions) {
   return Math.min(score, 100);
 }
 
-function getStaleContacts(contacts, interactions, limit = 3) {
+function getStaleContacts(contacts, _interactions, limit = 3) {
   const now = Date.now();
   const weekAgo = now - (7 * 24 * 60 * 60 * 1000);
 
@@ -347,19 +468,9 @@ function getStaleContacts(contacts, interactions, limit = 3) {
 }
 
 function showToast(message, type = 'success') {
-  // Remove existing toast
-  const existing = document.querySelector('.flock-toast');
-  if (existing) existing.remove();
-
-  const toast = document.createElement('div');
-  toast.className = `flock-toast flock-toast-${type}`;
-  toast.textContent = message;
-  document.body.appendChild(toast);
-
-  setTimeout(() => {
-    toast.classList.add('flock-toast-hide');
-    setTimeout(() => toast.remove(), 200);
-  }, 2000);
+  // Delegate to Toast module
+  const durations = { success: 3000, error: 5000, warning: 4000, info: 3000 };
+  Toast.show(message, type, durations[type] || 3000);
 }
 
 // ================================
@@ -1525,7 +1636,7 @@ function getNodeColor(contact, lists) {
   return stageColors[contact.pipelineStage] || stageColors.new;
 }
 
-function setupNetworkInteractions(canvas, ctx) {
+function setupNetworkInteractions(canvas, _ctx) {
   const tooltip = document.getElementById('networkTooltip');
 
   canvas.onmousedown = (e) => {
@@ -2974,6 +3085,9 @@ function downloadFile(content, filename, type) {
 
 async function init() {
   try {
+    // Initialize offline detection
+    OfflineHandler.init();
+
     // Load data
     allContacts = await getAllContacts();
     allInteractions = await getAllInteractions();
@@ -3052,9 +3166,7 @@ async function init() {
 
   } catch (error) {
     console.error('[Flock] Initialization error:', error);
-    document.getElementById('loadingState').innerHTML = `
-      <p style="color: var(--flock-error);">Failed to load. Please try again.</p>
-    `;
+    showErrorState('Failed to load data', init);
   }
 }
 

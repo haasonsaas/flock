@@ -1695,8 +1695,25 @@ const FeedIntelligence = {
   processedTweets: new Set(),
   // Cache for feed appearances
   feedCache: new Map(),
+  // Cache for contact lookups to reduce storage reads
+  contactCache: new Map(),
+  contactCacheExpiry: 30000, // 30 seconds
   // Throttle to avoid excessive storage writes
   saveTimeout: null,
+  // Debounce for processing tweets
+  processQueue: [],
+  processTimeout: null,
+
+  // Get cached contact to reduce storage reads
+  async getCachedContact(username) {
+    const cached = this.contactCache.get(username);
+    if (cached && Date.now() - cached.timestamp < this.contactCacheExpiry) {
+      return cached.contact;
+    }
+    const contact = await getContact(username);
+    this.contactCache.set(username, { contact, timestamp: Date.now() });
+    return contact;
+  },
 
   // Extract engagement metrics from a tweet element
   extractEngagementMetrics(tweetElement) {
@@ -1761,11 +1778,29 @@ const FeedIntelligence = {
     return null;
   },
 
-  // Process a tweet if it's from a saved contact
-  async processTweet(tweetElement) {
+  // Queue a tweet for processing (debounced batch processing)
+  queueTweet(tweetElement) {
     const tweetId = this.extractTweetId(tweetElement);
     if (!tweetId || this.processedTweets.has(tweetId)) return;
-    this.processedTweets.add(tweetId);
+
+    this.processQueue.push({ element: tweetElement, tweetId });
+
+    // Debounce: process batch after 100ms of no new tweets
+    clearTimeout(this.processTimeout);
+    this.processTimeout = setTimeout(() => this.processBatch(), 100);
+  },
+
+  // Process queued tweets in batch
+  async processBatch() {
+    if (this.processQueue.length === 0) return;
+
+    const batch = this.processQueue.splice(0, 50); // Process max 50 at a time
+
+    for (const { element, tweetId } of batch) {
+      if (this.processedTweets.has(tweetId)) continue;
+      this.processedTweets.add(tweetId);
+      await this.processTweet(element, tweetId);
+    }
 
     // Keep processed set from growing too large
     if (this.processedTweets.size > 500) {
@@ -1773,11 +1808,19 @@ const FeedIntelligence = {
       this.processedTweets = new Set(entries.slice(-250));
     }
 
+    // Process remaining if any
+    if (this.processQueue.length > 0) {
+      this.processTimeout = setTimeout(() => this.processBatch(), 50);
+    }
+  },
+
+  // Process a single tweet
+  async processTweet(tweetElement, tweetId) {
     const author = InteractionTracker.getTweetAuthor(tweetElement);
     if (!author || !InteractionTracker.isValidUsername(author)) return;
 
-    // Check if this is a saved contact
-    const contact = await getContact(author);
+    // Check if this is a saved contact (using cache)
+    const contact = await this.getCachedContact(author);
     if (!contact) return; // Only track for saved contacts
 
     // Extract intelligence
@@ -1803,8 +1846,6 @@ const FeedIntelligence = {
     // Debounced save
     clearTimeout(this.saveTimeout);
     this.saveTimeout = setTimeout(() => this.saveFeedIntelligence(), 2000);
-
-    console.log(`[Flock] Feed: @${author} tweet in timeline (${metrics.likes} likes, ${metrics.views} views)`);
   },
 
   // Save accumulated feed intelligence to storage
@@ -1874,9 +1915,9 @@ const FeedIntelligence = {
       return;
     }
 
-    // Process existing tweets
+    // Process existing tweets (queued)
     const existingTweets = document.querySelectorAll('article[data-testid="tweet"]');
-    existingTweets.forEach(tweet => this.processTweet(tweet));
+    existingTweets.forEach(tweet => this.queueTweet(tweet));
 
     // Observe for new tweets
     const observer = new MutationObserver((mutations) => {
@@ -1886,13 +1927,13 @@ const FeedIntelligence = {
 
           // Check if the node itself is a tweet
           if (node.matches?.('article[data-testid="tweet"]')) {
-            this.processTweet(node);
+            this.queueTweet(node);
           }
 
           // Check for tweets inside the added node
           const tweets = node.querySelectorAll?.('article[data-testid="tweet"]');
           if (tweets) {
-            tweets.forEach(tweet => this.processTweet(tweet));
+            tweets.forEach(tweet => this.queueTweet(tweet));
           }
         }
       }
@@ -1909,16 +1950,123 @@ const FeedIntelligence = {
       if (window.location.href !== lastUrl) {
         lastUrl = window.location.href;
         this.processedTweets.clear();
+        this.processQueue = [];
+        this.contactCache.clear();
 
         // Process tweets on new page after a delay
         setTimeout(() => {
           const tweets = document.querySelectorAll('article[data-testid="tweet"]');
-          tweets.forEach(tweet => this.processTweet(tweet));
+          tweets.forEach(tweet => this.queueTweet(tweet));
         }, 1000);
       }
     }, 500);
 
+    // Periodically clean contact cache
+    setInterval(() => {
+      const now = Date.now();
+      for (const [key, value] of this.contactCache) {
+        if (now - value.timestamp > this.contactCacheExpiry) {
+          this.contactCache.delete(key);
+        }
+      }
+    }, 60000);
+
     console.log('[Flock] Feed Intelligence enabled - tracking contact appearances in timeline');
+  }
+};
+
+// ================================
+// STORAGE MANAGEMENT
+// ================================
+
+const StorageManager = {
+  // Storage limits (Chrome allows 10MB for local storage)
+  MAX_INTERACTIONS: 5000,
+  MAX_FEED_APPEARANCES_PER_CONTACT: 50,
+  MAX_FEED_INTEL_AGE_DAYS: 90,
+  CLEANUP_INTERVAL: 24 * 60 * 60 * 1000, // 24 hours
+
+  // Run cleanup on startup and periodically
+  async init() {
+    await this.cleanup();
+    setInterval(() => this.cleanup(), this.CLEANUP_INTERVAL);
+    console.log('[Flock] Storage manager initialized');
+  },
+
+  // Clean up old data to stay within quota
+  async cleanup() {
+    try {
+      await Promise.all([
+        this.cleanupInteractions(),
+        this.cleanupFeedIntelligence(),
+      ]);
+      console.log('[Flock] Storage cleanup completed');
+    } catch (e) {
+      console.error('[Flock] Storage cleanup error:', e);
+    }
+  },
+
+  // Clean up old interactions
+  async cleanupInteractions() {
+    const result = await chrome.storage.local.get('interactions');
+    const interactions = result.interactions || {};
+    const entries = Object.entries(interactions);
+
+    if (entries.length <= this.MAX_INTERACTIONS) return;
+
+    // Sort by timestamp and keep most recent
+    const sorted = entries.sort((a, b) => (b[1].timestamp || 0) - (a[1].timestamp || 0));
+    const toKeep = sorted.slice(0, this.MAX_INTERACTIONS);
+    const cleaned = Object.fromEntries(toKeep);
+
+    await chrome.storage.local.set({ interactions: cleaned });
+    console.log(`[Flock] Cleaned ${entries.length - toKeep.length} old interactions`);
+  },
+
+  // Clean up old feed intelligence
+  async cleanupFeedIntelligence() {
+    const result = await chrome.storage.local.get('feedIntelligence');
+    const intelligence = result.feedIntelligence || {};
+    const cutoff = Date.now() - (this.MAX_FEED_INTEL_AGE_DAYS * 24 * 60 * 60 * 1000);
+    let cleaned = false;
+
+    for (const [username, data] of Object.entries(intelligence)) {
+      // Remove users not seen in 90 days
+      if (data.lastSeen && data.lastSeen < cutoff) {
+        delete intelligence[username];
+        cleaned = true;
+        continue;
+      }
+
+      // Trim appearances to max
+      if (data.appearances?.length > this.MAX_FEED_APPEARANCES_PER_CONTACT) {
+        data.appearances = data.appearances.slice(-this.MAX_FEED_APPEARANCES_PER_CONTACT);
+        cleaned = true;
+      }
+    }
+
+    if (cleaned) {
+      await chrome.storage.local.set({ feedIntelligence: intelligence });
+      console.log('[Flock] Cleaned old feed intelligence data');
+    }
+  },
+
+  // Get storage usage stats
+  async getUsageStats() {
+    const data = await chrome.storage.local.get(null);
+    const bytes = new Blob([JSON.stringify(data)]).size;
+    const contacts = Object.keys(data.contacts || {}).length;
+    const interactions = Object.keys(data.interactions || {}).length;
+    const feedIntel = Object.keys(data.feedIntelligence || {}).length;
+
+    return {
+      totalBytes: bytes,
+      totalMB: (bytes / (1024 * 1024)).toFixed(2),
+      contacts,
+      interactions,
+      feedIntelContacts: feedIntel,
+      percentUsed: ((bytes / (10 * 1024 * 1024)) * 100).toFixed(1) // 10MB limit
+    };
   }
 };
 
@@ -2390,6 +2538,60 @@ Return ONLY a JSON array of 3 short message ideas (max 100 chars each), no expla
   }
 };
 // ================================
+// ERROR HANDLING & OFFLINE SUPPORT
+// ================================
+
+const ErrorHandler = {
+  isOnline: navigator.onLine,
+  pendingOperations: [],
+
+  init() {
+    // Monitor online/offline status
+    window.addEventListener('online', () => {
+      this.isOnline = true;
+      console.log('[Flock] Back online - processing pending operations');
+      this.processPendingOperations();
+    });
+
+    window.addEventListener('offline', () => {
+      this.isOnline = false;
+      console.log('[Flock] Offline - operations will be queued');
+    });
+  },
+
+  // Wrap async operations with error handling
+  async safeOperation(operation, fallback = null) {
+    try {
+      return await operation();
+    } catch (error) {
+      console.error('[Flock] Operation failed:', error);
+      return fallback;
+    }
+  },
+
+  // Queue operation for when back online
+  queueOperation(operation) {
+    if (this.isOnline) {
+      return operation();
+    }
+    this.pendingOperations.push(operation);
+    return Promise.resolve(null);
+  },
+
+  // Process queued operations
+  async processPendingOperations() {
+    while (this.pendingOperations.length > 0) {
+      const operation = this.pendingOperations.shift();
+      try {
+        await operation();
+      } catch (e) {
+        console.error('[Flock] Failed to process pending operation:', e);
+      }
+    }
+  }
+};
+
+// ================================
 // INITIALIZATION
 // ================================
 
@@ -2397,6 +2599,12 @@ async function init() {
   console.log('[Flock] Initializing...');
 
   try {
+    // Initialize error handling & offline support
+    ErrorHandler.init();
+
+    // Initialize storage management (cleanup old data)
+    await StorageManager.init();
+
     // Initial injection
     injectSaveButton();
 
