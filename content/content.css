@@ -1177,3 +1177,217 @@
 .flock-followup-reason h4 {
   color: #F59E0B;
 }
+
+/* ================================
+   TEMPLATE PICKER
+   ================================ */
+
+.flock-template-picker {
+  position: fixed;
+  width: 320px;
+  background: rgb(22, 24, 28);
+  border: 1px solid rgb(47, 51, 54);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  animation: flock-scale-in 0.15s ease-out;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.flock-template-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  background: rgb(32, 35, 39);
+  border-bottom: 1px solid rgb(47, 51, 54);
+}
+
+.flock-template-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #E7E9EA;
+}
+
+.flock-template-title svg {
+  width: 18px;
+  height: 18px;
+  stroke: #F59E0B;
+}
+
+.flock-template-close {
+  all: unset;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: background 150ms;
+}
+
+.flock-template-close:hover {
+  background: rgb(47, 51, 54);
+}
+
+.flock-template-close svg {
+  width: 18px;
+  height: 18px;
+  stroke: rgb(113, 118, 123);
+}
+
+.flock-template-list {
+  max-height: 280px;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.flock-template-item {
+  all: unset;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 150ms;
+  box-sizing: border-box;
+}
+
+.flock-template-item:hover {
+  background: rgb(39, 44, 48);
+}
+
+.flock-template-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #E7E9EA;
+}
+
+.flock-template-preview {
+  font-size: 13px;
+  color: rgb(113, 118, 123);
+  line-height: 1.4;
+}
+
+.flock-template-footer {
+  padding: 8px;
+  border-top: 1px solid rgb(47, 51, 54);
+}
+
+.flock-template-add {
+  all: unset;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: #F59E0B;
+  transition: background 150ms;
+  box-sizing: border-box;
+}
+
+.flock-template-add:hover {
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.flock-template-add svg {
+  width: 16px;
+  height: 16px;
+  stroke: #F59E0B;
+}
+
+/* ================================
+   TEMPLATE TRIGGER BUTTON
+   ================================ */
+
+.flock-template-trigger {
+  all: unset;
+  position: absolute;
+  right: 48px;
+  bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  background: rgba(245, 158, 11, 0.15);
+  transition: all 150ms;
+  z-index: 100;
+}
+
+.flock-template-trigger:hover {
+  background: rgba(245, 158, 11, 0.25);
+  transform: scale(1.05);
+}
+
+.flock-template-trigger svg {
+  width: 18px;
+  height: 18px;
+  stroke: #F59E0B;
+}
+
+/* ================================
+   KEYBOARD SHORTCUT HINT
+   ================================ */
+
+.flock-shortcut-hint {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 10px 16px;
+  background: rgb(22, 24, 28);
+  border: 1px solid rgb(47, 51, 54);
+  border-radius: 12px;
+  font-size: 13px;
+  color: rgb(113, 118, 123);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  animation: flock-fade-in 0.2s ease-out;
+  z-index: 10000;
+}
+
+.flock-shortcut-hint kbd {
+  display: inline-block;
+  padding: 3px 6px;
+  background: rgb(39, 44, 48);
+  border-radius: 4px;
+  font-family: "SF Mono", "Roboto Mono", monospace;
+  font-size: 12px;
+  color: #E7E9EA;
+  margin: 0 2px;
+}
+
+@keyframes flock-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes flock-fade-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}

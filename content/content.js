@@ -1131,6 +1131,462 @@ function handleNavigation() {
 }
 
 // ================================
+// AUTO-TRACK INTERACTIONS
+// ================================
+
+const InteractionTracker = {
+  lastTrackedAction: null,
+
+  // Debounce to prevent duplicate tracking
+  debounce(key, delay = 2000) {
+    const now = Date.now();
+    if (this.lastTrackedAction?.key === key && now - this.lastTrackedAction.time < delay) {
+      return false;
+    }
+    this.lastTrackedAction = { key, time: now };
+    return true;
+  },
+
+  // Extract username from a tweet element
+  getTweetAuthor(tweetElement) {
+    const userLink = tweetElement.querySelector('a[href^="/"][role="link"]');
+    if (userLink) {
+      const match = userLink.href.match(/twitter\.com\/([^\/\?]+)|x\.com\/([^\/\?]+)/);
+      return match ? (match[1] || match[2]) : null;
+    }
+    return null;
+  },
+
+  // Get DM conversation partner username
+  getDMPartner() {
+    // Check URL for DM conversation
+    const match = window.location.pathname.match(/\/messages\/(\d+)-(\d+)/);
+    if (match) {
+      // Try to get username from conversation header
+      const header = document.querySelector('[data-testid="conversation-header"]');
+      if (header) {
+        const usernameEl = header.querySelector('a[href^="/"]');
+        if (usernameEl) {
+          const href = usernameEl.getAttribute('href');
+          return href?.replace('/', '') || null;
+        }
+      }
+      // Fallback: look for username in the DM header
+      const nameLink = document.querySelector('[data-testid="DM_Conversation_Avatar"]')?.closest('div')?.querySelector('a[href^="/"]');
+      if (nameLink) {
+        return nameLink.getAttribute('href')?.replace('/', '') || null;
+      }
+    }
+    return null;
+  },
+
+  async trackLike(tweetElement) {
+    const author = this.getTweetAuthor(tweetElement);
+    if (!author) return;
+
+    const contact = await getContact(author);
+    if (!contact) return; // Only track for saved contacts
+
+    const key = `like-${author}-${Date.now().toString().slice(0, -4)}`;
+    if (!this.debounce(key)) return;
+
+    await logInteraction(author, 'like', 'Liked a tweet', {
+      url: window.location.href,
+      auto: true
+    });
+
+    console.log(`[Flock] Auto-tracked: Liked tweet from @${author}`);
+    showToast(`Tracked: Liked @${author}'s tweet`, 'success');
+  },
+
+  async trackReply(tweetElement) {
+    const author = this.getTweetAuthor(tweetElement);
+    if (!author) return;
+
+    const contact = await getContact(author);
+    if (!contact) return;
+
+    const key = `reply-${author}-${Date.now().toString().slice(0, -4)}`;
+    if (!this.debounce(key)) return;
+
+    await logInteraction(author, 'reply', 'Replied to a tweet', {
+      url: window.location.href,
+      auto: true
+    });
+
+    console.log(`[Flock] Auto-tracked: Replied to @${author}`);
+    showToast(`Tracked: Replied to @${author}`, 'success');
+  },
+
+  async trackDM() {
+    const partner = this.getDMPartner();
+    if (!partner) return;
+
+    const contact = await getContact(partner);
+    if (!contact) return;
+
+    const key = `dm-${partner}-${Date.now().toString().slice(0, -4)}`;
+    if (!this.debounce(key, 5000)) return; // 5s debounce for DMs
+
+    await logInteraction(partner, 'dm', 'Sent a DM', {
+      url: window.location.href,
+      auto: true
+    });
+
+    console.log(`[Flock] Auto-tracked: DM to @${partner}`);
+    showToast(`Tracked: DM to @${partner}`, 'success');
+  },
+
+  observeInteractions() {
+    // Track likes
+    document.addEventListener('click', async (e) => {
+      const likeButton = e.target.closest('[data-testid="like"]');
+      if (likeButton) {
+        const tweet = likeButton.closest('article');
+        if (tweet) {
+          // Small delay to let the like register
+          setTimeout(() => this.trackLike(tweet), 500);
+        }
+      }
+
+      // Track replies (when clicking reply button, then detecting send)
+      const replyButton = e.target.closest('[data-testid="reply"]');
+      if (replyButton) {
+        const tweet = replyButton.closest('article');
+        if (tweet) {
+          // Store the tweet we're replying to
+          this.pendingReplyTo = tweet;
+        }
+      }
+
+      // Track when tweet is sent (could be a reply)
+      const tweetButton = e.target.closest('[data-testid="tweetButton"], [data-testid="tweetButtonInline"]');
+      if (tweetButton && this.pendingReplyTo) {
+        setTimeout(() => {
+          this.trackReply(this.pendingReplyTo);
+          this.pendingReplyTo = null;
+        }, 1000);
+      }
+
+      // Track DM sends
+      const dmSendButton = e.target.closest('[data-testid="dmComposerSendButton"]');
+      if (dmSendButton) {
+        setTimeout(() => this.trackDM(), 500);
+      }
+    }, true);
+
+    console.log('[Flock] Interaction tracking enabled');
+  }
+};
+
+// ================================
+// KEYBOARD SHORTCUTS
+// ================================
+
+const KeyboardShortcuts = {
+  shortcuts: {
+    'cmd+shift+s': 'saveProfile',
+    'ctrl+shift+s': 'saveProfile',
+    'cmd+shift+f': 'openSidebar',
+    'ctrl+shift+f': 'openSidebar',
+    'cmd+shift+t': 'openTemplates',
+    'ctrl+shift+t': 'openTemplates',
+  },
+
+  init() {
+    document.addEventListener('keydown', (e) => this.handleKeydown(e));
+    console.log('[Flock] Keyboard shortcuts enabled (Cmd/Ctrl+Shift+S: Save, Cmd/Ctrl+Shift+F: Sidebar, Cmd/Ctrl+Shift+T: Templates)');
+  },
+
+  getKeyCombo(e) {
+    const parts = [];
+    if (e.metaKey) parts.push('cmd');
+    if (e.ctrlKey) parts.push('ctrl');
+    if (e.shiftKey) parts.push('shift');
+    if (e.altKey) parts.push('alt');
+    parts.push(e.key.toLowerCase());
+    return parts.join('+');
+  },
+
+  async handleKeydown(e) {
+    const combo = this.getKeyCombo(e);
+    const action = this.shortcuts[combo];
+
+    if (!action) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    switch (action) {
+      case 'saveProfile':
+        await this.saveCurrentProfile();
+        break;
+      case 'openSidebar':
+        await this.openCurrentSidebar();
+        break;
+      case 'openTemplates':
+        DMTemplates.showPicker();
+        break;
+    }
+  },
+
+  async saveCurrentProfile() {
+    if (!TwitterParser.isProfilePage()) {
+      showToast('Navigate to a profile to save', 'error');
+      return;
+    }
+
+    const username = TwitterParser.getCurrentUsername();
+    const existing = await getContact(username);
+
+    if (existing) {
+      showToast(`@${username} already saved`, 'success');
+      sidebar.open(username);
+      return;
+    }
+
+    const profileData = TwitterParser.extractProfileData();
+    if (profileData) {
+      await saveContact(profileData);
+      showToast(`Saved @${username}`, 'success');
+
+      // Update button UI if present
+      const btn = document.querySelector('.flock-btn');
+      if (btn) {
+        btn.classList.add('flock-saved');
+        btn.innerHTML = Icons.bookmarkFilled;
+      }
+    }
+  },
+
+  async openCurrentSidebar() {
+    if (!TwitterParser.isProfilePage()) {
+      showToast('Navigate to a profile first', 'error');
+      return;
+    }
+
+    const username = TwitterParser.getCurrentUsername();
+    sidebar.toggle(username);
+  }
+};
+
+// ================================
+// DM TEMPLATES
+// ================================
+
+const DMTemplates = {
+  defaultTemplates: [
+    {
+      id: 'intro',
+      name: 'Introduction',
+      text: "Hey {name}! I came across your profile and really enjoyed your content about {topic}. Would love to connect!"
+    },
+    {
+      id: 'followup',
+      name: 'Follow-up',
+      text: "Hey {name}, just wanted to follow up on my previous message. Let me know if you'd be interested in chatting!"
+    },
+    {
+      id: 'collab',
+      name: 'Collaboration',
+      text: "Hey {name}! I've been following your work and think there might be a great opportunity to collaborate. Would you be open to a quick chat?"
+    },
+    {
+      id: 'congrats',
+      name: 'Congratulations',
+      text: "Hey {name}, just saw the news - congrats! 🎉 Really impressive stuff."
+    }
+  ],
+
+  async getTemplates() {
+    const result = await chrome.storage.local.get('dmTemplates');
+    return result.dmTemplates || this.defaultTemplates;
+  },
+
+  async saveTemplates(templates) {
+    await chrome.storage.local.set({ dmTemplates: templates });
+  },
+
+  async addTemplate(name, text) {
+    const templates = await this.getTemplates();
+    templates.push({
+      id: `custom_${Date.now()}`,
+      name,
+      text
+    });
+    await this.saveTemplates(templates);
+    return templates;
+  },
+
+  fillPlaceholders(text, contact) {
+    return text
+      .replace(/{name}/g, contact?.displayName?.split(' ')[0] || 'there')
+      .replace(/{fullname}/g, contact?.displayName || 'there')
+      .replace(/{username}/g, contact?.username || '')
+      .replace(/{topic}/g, '[topic]')
+      .replace(/{company}/g, contact?.enrichedData?.company || '[company]');
+  },
+
+  showPicker(targetInput = null) {
+    // Remove existing picker
+    this.closePicker();
+
+    // Find DM input if not provided
+    if (!targetInput) {
+      targetInput = document.querySelector('[data-testid="dmComposerTextInput"]');
+    }
+
+    if (!targetInput) {
+      showToast('Open a DM conversation first', 'error');
+      return;
+    }
+
+    this.createPickerUI(targetInput);
+  },
+
+  async createPickerUI(targetInput) {
+    const templates = await this.getTemplates();
+    const partner = InteractionTracker.getDMPartner();
+    const contact = partner ? await getContact(partner) : null;
+
+    const picker = document.createElement('div');
+    picker.className = 'flock-template-picker';
+    picker.innerHTML = `
+      <div class="flock-template-header">
+        <span class="flock-template-title">${Icons.message} Quick Templates</span>
+        <button class="flock-template-close">${Icons.close}</button>
+      </div>
+      <div class="flock-template-list">
+        ${templates.map(t => `
+          <button class="flock-template-item" data-template-id="${t.id}">
+            <span class="flock-template-name">${t.name}</span>
+            <span class="flock-template-preview">${this.fillPlaceholders(t.text, contact).substring(0, 50)}...</span>
+          </button>
+        `).join('')}
+      </div>
+      <div class="flock-template-footer">
+        <button class="flock-template-add">
+          ${Icons.plus} New Template
+        </button>
+      </div>
+    `;
+
+    // Position near the input
+    const rect = targetInput.getBoundingClientRect();
+    picker.style.position = 'fixed';
+    picker.style.bottom = `${window.innerHeight - rect.top + 10}px`;
+    picker.style.left = `${rect.left}px`;
+    picker.style.zIndex = '10001';
+
+    document.body.appendChild(picker);
+
+    // Event handlers
+    picker.querySelector('.flock-template-close').addEventListener('click', () => this.closePicker());
+
+    picker.querySelectorAll('.flock-template-item').forEach(item => {
+      item.addEventListener('click', async () => {
+        const templateId = item.dataset.templateId;
+        const template = templates.find(t => t.id === templateId);
+        if (template) {
+          const filledText = this.fillPlaceholders(template.text, contact);
+          this.insertText(targetInput, filledText);
+          this.closePicker();
+          showToast('Template inserted', 'success');
+        }
+      });
+    });
+
+    picker.querySelector('.flock-template-add').addEventListener('click', async () => {
+      const name = prompt('Template name:');
+      if (!name) return;
+      const text = prompt('Template text (use {name}, {username}, {topic} as placeholders):');
+      if (!text) return;
+
+      await this.addTemplate(name, text);
+      showToast('Template saved!', 'success');
+      this.closePicker();
+    });
+
+    // Close on outside click
+    setTimeout(() => {
+      document.addEventListener('click', this.handleOutsideClick);
+    }, 100);
+  },
+
+  handleOutsideClick(e) {
+    const picker = document.querySelector('.flock-template-picker');
+    if (picker && !picker.contains(e.target)) {
+      DMTemplates.closePicker();
+    }
+  },
+
+  closePicker() {
+    const picker = document.querySelector('.flock-template-picker');
+    if (picker) picker.remove();
+    document.removeEventListener('click', this.handleOutsideClick);
+  },
+
+  insertText(input, text) {
+    // Focus the input
+    input.focus();
+
+    // Try to set value directly for contenteditable divs
+    if (input.getAttribute('contenteditable') === 'true') {
+      // Twitter uses Draft.js, so we need to simulate typing
+      const dataTransfer = new DataTransfer();
+      dataTransfer.setData('text/plain', text);
+
+      const pasteEvent = new ClipboardEvent('paste', {
+        bubbles: true,
+        cancelable: true,
+        clipboardData: dataTransfer
+      });
+
+      input.dispatchEvent(pasteEvent);
+
+      // Fallback: try execCommand
+      if (!input.textContent.includes(text)) {
+        document.execCommand('insertText', false, text);
+      }
+    } else {
+      // Standard input
+      input.value = text;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  },
+
+  // Inject template button near DM composer
+  injectTemplateButton() {
+    const composer = document.querySelector('[data-testid="dmComposerTextInput"]');
+    if (!composer) return;
+
+    const existingBtn = document.querySelector('.flock-template-trigger');
+    if (existingBtn) return;
+
+    const container = composer.closest('[data-testid="DmActivityViewport"]') || composer.parentElement;
+    if (!container) return;
+
+    const btn = document.createElement('button');
+    btn.className = 'flock-template-trigger';
+    btn.innerHTML = Icons.message;
+    btn.title = 'Insert template (Cmd/Ctrl+Shift+T)';
+
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.showPicker(composer);
+    });
+
+    // Insert button near composer
+    const composerWrapper = composer.closest('div[data-testid]')?.parentElement;
+    if (composerWrapper) {
+      composerWrapper.style.position = 'relative';
+      composerWrapper.appendChild(btn);
+    }
+  }
+};
+
+// ================================
 // INITIALIZATION
 // ================================
 
@@ -1143,6 +1599,19 @@ async function init() {
 
     // Observe navigation
     observeNavigation();
+
+    // Enable interaction tracking
+    InteractionTracker.observeInteractions();
+
+    // Enable keyboard shortcuts
+    KeyboardShortcuts.init();
+
+    // Check for DM composer periodically and inject template button
+    setInterval(() => {
+      if (window.location.pathname.includes('/messages')) {
+        DMTemplates.injectTemplateButton();
+      }
+    }, 1000);
 
     console.log('[Flock] Ready');
   } catch (error) {
