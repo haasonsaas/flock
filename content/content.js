@@ -2912,11 +2912,9 @@ async function init() {
       }
     }, 1000);
 
-    // Enable timeline indicators for saved contacts
-    TimelineIndicators.startObserving();
-    TimelineIndicators.startCacheCleaner();
-
-    // Quick add from timeline disabled - too intrusive on hover
+    // Timeline UI disabled - keep timeline clean, only passive intelligence
+    // TimelineIndicators.startObserving();
+    // TimelineIndicators.startCacheCleaner();
     // QuickAdd.init();
 
     // Enable feed intelligence (track contact appearances in timeline)
