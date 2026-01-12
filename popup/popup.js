@@ -286,6 +286,228 @@ function showErrorState(message, retryFn = null) {
 }
 
 // ================================
+// CONTACT SCORING ENGINE
+// ================================
+
+const ContactScoring = {
+  // Weight configuration
+  weights: {
+    influence: 0.25,
+    opportunity: 0.25,
+    engagement: 0.30,
+    relationship: 0.20
+  },
+
+  // Calculate composite score for a contact
+  calculateScore(contact, interactions = {}) {
+    const influence = this.scoreInfluence(contact);
+    const opportunity = this.scoreOpportunity(contact);
+    const engagement = this.scoreEngagement(contact, interactions);
+    const relationship = this.scoreRelationshipDepth(contact, interactions);
+
+    const composite = Math.round(
+      (influence * this.weights.influence) +
+      (opportunity * this.weights.opportunity) +
+      (engagement * this.weights.engagement) +
+      (relationship * this.weights.relationship)
+    );
+
+    return {
+      score: Math.min(100, Math.max(0, composite)),
+      components: {
+        influence: Math.round(influence),
+        opportunity: Math.round(opportunity),
+        engagement: Math.round(engagement),
+        relationship: Math.round(relationship)
+      },
+      tier: composite >= 75 ? 'A' : composite >= 50 ? 'B' : composite >= 25 ? 'C' : 'D',
+      label: this.getScoreLabel(composite)
+    };
+  },
+
+  // Influence: followers, verification, following ratio
+  scoreInfluence(contact) {
+    let score = 0;
+    const followers = contact.followersCount || 0;
+    const following = contact.followingCount || 1;
+
+    // Follower score (logarithmic scale, max 50 points)
+    // 100 followers = ~13, 1K = ~20, 10K = ~27, 100K = ~33, 1M = ~40
+    if (followers > 0) {
+      score += Math.min(50, Math.log10(followers) * 8);
+    }
+
+    // Verification bonus (20 points)
+    if (contact.isVerified) {
+      score += 20;
+    }
+
+    // Follower/following ratio bonus (max 15 points)
+    // High ratio = influential (people follow them, they're selective)
+    const ratio = followers / following;
+    if (ratio > 1) {
+      score += Math.min(15, Math.log10(ratio) * 10);
+    }
+
+    // Has profile image (5 points)
+    if (contact.profileImageUrl && !contact.profileImageUrl.includes('default_profile')) {
+      score += 5;
+    }
+
+    // Has banner (5 points)
+    if (contact.bannerImageUrl) {
+      score += 5;
+    }
+
+    return Math.min(100, score);
+  },
+
+  // Opportunity: bio quality, profile completeness, signals
+  scoreOpportunity(contact) {
+    let score = 0;
+    const bio = contact.bio || '';
+
+    // Bio length/quality (max 30 points)
+    const bioLength = bio.length;
+    if (bioLength > 0) {
+      score += Math.min(30, bioLength / 5);
+    }
+
+    // Has website (15 points) - signals serious professional
+    if (contact.website) {
+      score += 15;
+    }
+
+    // Has location (10 points)
+    if (contact.location) {
+      score += 10;
+    }
+
+    // Bio keyword signals (max 25 points)
+    const highValueKeywords = [
+      'founder', 'ceo', 'cto', 'investor', 'partner', 'director',
+      'vp', 'head of', 'building', 'angel', 'vc', 'venture',
+      'startup', 'entrepreneur', 'advisor', 'board'
+    ];
+    const bioLower = bio.toLowerCase();
+    let keywordScore = 0;
+    highValueKeywords.forEach(keyword => {
+      if (bioLower.includes(keyword)) {
+        keywordScore += 5;
+      }
+    });
+    score += Math.min(25, keywordScore);
+
+    // Display name quality (10 points)
+    if (contact.displayName && contact.displayName !== contact.username) {
+      score += 10;
+    }
+
+    // Account age bonus - longer accounts = more established (10 points)
+    if (contact.joinDate) {
+      const joinYear = new Date(contact.joinDate).getFullYear();
+      const yearsActive = new Date().getFullYear() - joinYear;
+      score += Math.min(10, yearsActive * 2);
+    }
+
+    return Math.min(100, score);
+  },
+
+  // Engagement: recency and frequency of interactions
+  scoreEngagement(contact, interactions) {
+    let score = 0;
+    const now = Date.now();
+    const dayMs = 24 * 60 * 60 * 1000;
+
+    // Recency score (max 50 points)
+    // Interacted today = 50, yesterday = 45, this week = 35, this month = 20, older = 5
+    if (contact.lastInteraction) {
+      const daysSince = (now - contact.lastInteraction) / dayMs;
+      if (daysSince < 1) score += 50;
+      else if (daysSince < 2) score += 45;
+      else if (daysSince < 7) score += 35;
+      else if (daysSince < 14) score += 25;
+      else if (daysSince < 30) score += 15;
+      else if (daysSince < 90) score += 5;
+    }
+
+    // Interaction count (max 30 points)
+    const contactInteractions = Object.values(interactions)
+      .filter(i => i.username === contact.username);
+    const interactionCount = contactInteractions.length;
+    score += Math.min(30, interactionCount * 5);
+
+    // Pipeline stage bonus (max 20 points)
+    const stageScores = {
+      'new': 5,
+      'contacted': 10,
+      'engaged': 15,
+      'qualified': 20,
+      'won': 20,
+      'lost': 0
+    };
+    score += stageScores[contact.pipelineStage] || 5;
+
+    return Math.min(100, score);
+  },
+
+  // Relationship depth: notes, tags, interaction variety
+  scoreRelationshipDepth(contact, interactions) {
+    let score = 0;
+
+    // Notes quality (max 35 points)
+    const notes = contact.notes || '';
+    if (notes.length > 0) {
+      score += Math.min(35, 10 + (notes.length / 20));
+    }
+
+    // Tags (max 20 points)
+    const tagCount = (contact.tags || []).length;
+    score += Math.min(20, tagCount * 5);
+
+    // In lists (max 10 points)
+    const listCount = (contact.listIds || []).length;
+    score += Math.min(10, listCount * 5);
+
+    // Has reminder set (10 points) - shows active management
+    if (contact.reminder?.date) {
+      score += 10;
+    }
+
+    // Interaction type variety (max 25 points)
+    const contactInteractions = Object.values(interactions)
+      .filter(i => i.username === contact.username);
+    const interactionTypes = new Set(contactInteractions.map(i => i.type));
+    score += Math.min(25, interactionTypes.size * 5);
+
+    return Math.min(100, score);
+  },
+
+  // Get human-readable label
+  getScoreLabel(score) {
+    if (score >= 80) return 'Hot Lead';
+    if (score >= 60) return 'Warm';
+    if (score >= 40) return 'Active';
+    if (score >= 20) return 'Cool';
+    return 'Cold';
+  },
+
+  // Get score color
+  getScoreColor(score) {
+    if (score >= 80) return '#EF4444'; // Red - hot
+    if (score >= 60) return '#F59E0B'; // Amber - warm
+    if (score >= 40) return '#10B981'; // Green - active
+    if (score >= 20) return '#3B82F6'; // Blue - cool
+    return '#6B7280'; // Gray - cold
+  },
+
+  // Get tier badge class
+  getTierClass(tier) {
+    return `flock-tier-${tier.toLowerCase()}`;
+  }
+};
+
+// ================================
 // LISTS STORAGE
 // ================================
 
@@ -511,8 +733,12 @@ function renderContactCard(contact, interactions = {}) {
   const strength = getRelationshipStrength(contact, interactions);
   const strengthClass = strength >= 60 ? 'strong' : strength >= 30 ? 'medium' : 'weak';
 
+  // Calculate contact score
+  const scoreData = ContactScoring.calculateScore(contact, interactions);
+  const scoreColor = ContactScoring.getScoreColor(scoreData.score);
+
   return `
-    <div class="flock-contact-card ${bulkSelectMode ? 'flock-bulk-mode' : ''} ${selectedContacts.has(contact.username) ? 'flock-selected' : ''}" data-username="${escapeHtml(contact.username)}">
+    <div class="flock-contact-card ${bulkSelectMode ? 'flock-bulk-mode' : ''} ${selectedContacts.has(contact.username) ? 'flock-selected' : ''}" data-username="${escapeHtml(contact.username)}" data-score="${scoreData.score}">
       ${bulkSelectMode ? `
         <label class="flock-bulk-checkbox-wrap">
           <input type="checkbox" class="flock-bulk-checkbox" ${selectedContacts.has(contact.username) ? 'checked' : ''}>
@@ -535,7 +761,12 @@ function renderContactCard(contact, interactions = {}) {
         </div>
       </div>
       <div class="flock-contact-info">
-        <div class="flock-contact-name">${escapeHtml(contact.displayName || contact.username)}</div>
+        <div class="flock-contact-name-row">
+          <span class="flock-contact-name">${escapeHtml(contact.displayName || contact.username)}</span>
+          <span class="flock-contact-score" style="--score-color: ${scoreColor}" title="${scoreData.label}: Influence ${scoreData.components.influence}, Opportunity ${scoreData.components.opportunity}, Engagement ${scoreData.components.engagement}, Relationship ${scoreData.components.relationship}">
+            ${scoreData.score}
+          </span>
+        </div>
         <div class="flock-contact-username">@${escapeHtml(contact.username)}</div>
         <div class="flock-contact-meta">
           <div class="flock-stage-quick" data-username="${escapeHtml(contact.username)}">
@@ -722,6 +953,10 @@ async function showContactDetail(username) {
   const contactList = document.getElementById('contactList');
   const filterBar = document.getElementById('filterBar');
 
+  // Calculate contact score
+  const scoreData = ContactScoring.calculateScore(contact, interactions);
+  const scoreColor = ContactScoring.getScoreColor(scoreData.score);
+
   panel.innerHTML = `
     <div class="flock-detail-header">
       <button class="flock-back-btn" id="backBtn">${Icons.back} Back</button>
@@ -744,6 +979,45 @@ async function showContactDetail(username) {
       </div>
     </div>
     ${contact.bio ? `<p class="flock-detail-bio">${escapeHtml(contact.bio)}</p>` : ''}
+    <div class="flock-detail-section flock-score-section">
+      <h3>Contact Score</h3>
+      <div class="flock-score-display">
+        <div class="flock-score-main" style="--score-color: ${scoreColor}">
+          <span class="flock-score-number">${scoreData.score}</span>
+          <span class="flock-score-label">${scoreData.label}</span>
+        </div>
+        <div class="flock-score-breakdown">
+          <div class="flock-score-bar">
+            <span class="flock-score-bar-label">Influence</span>
+            <div class="flock-score-bar-track">
+              <div class="flock-score-bar-fill" style="width: ${scoreData.components.influence}%; --bar-color: #8B5CF6"></div>
+            </div>
+            <span class="flock-score-bar-value">${scoreData.components.influence}</span>
+          </div>
+          <div class="flock-score-bar">
+            <span class="flock-score-bar-label">Opportunity</span>
+            <div class="flock-score-bar-track">
+              <div class="flock-score-bar-fill" style="width: ${scoreData.components.opportunity}%; --bar-color: #3B82F6"></div>
+            </div>
+            <span class="flock-score-bar-value">${scoreData.components.opportunity}</span>
+          </div>
+          <div class="flock-score-bar">
+            <span class="flock-score-bar-label">Engagement</span>
+            <div class="flock-score-bar-track">
+              <div class="flock-score-bar-fill" style="width: ${scoreData.components.engagement}%; --bar-color: #10B981"></div>
+            </div>
+            <span class="flock-score-bar-value">${scoreData.components.engagement}</span>
+          </div>
+          <div class="flock-score-bar">
+            <span class="flock-score-bar-label">Relationship</span>
+            <div class="flock-score-bar-track">
+              <div class="flock-score-bar-fill" style="width: ${scoreData.components.relationship}%; --bar-color: #F59E0B"></div>
+            </div>
+            <span class="flock-score-bar-value">${scoreData.components.relationship}</span>
+          </div>
+        </div>
+      </div>
+    </div>
     <div class="flock-detail-section">
       <h3>Pipeline Stage</h3>
       <div class="flock-stage-pills">
@@ -2551,7 +2825,7 @@ function setupBulkOperations() {
 // FILTERING & SORTING
 // ================================
 
-let currentFilter = { stage: '', sort: 'recent', followupOnly: false, list: '' };
+let currentFilter = { stage: '', sort: 'score', followupOnly: false, list: '' };
 
 function applyFiltersAndSort() {
   let filtered = [...allContacts];
@@ -2574,6 +2848,14 @@ function applyFiltersAndSort() {
 
   // Sort
   switch (currentFilter.sort) {
+    case 'score':
+      // Sort by contact score (highest first)
+      filtered.sort((a, b) => {
+        const scoreA = ContactScoring.calculateScore(a, allInteractions).score;
+        const scoreB = ContactScoring.calculateScore(b, allInteractions).score;
+        return scoreB - scoreA;
+      });
+      break;
     case 'name':
       filtered.sort((a, b) => (a.displayName || a.username).localeCompare(b.displayName || b.username));
       break;

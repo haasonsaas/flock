@@ -3842,3 +3842,137 @@ body::before {
   50% { content: '..'; }
   75% { content: '...'; }
 }
+
+/* ================================
+   CONTACT SCORING
+   ================================ */
+
+/* Score badge in contact card */
+.flock-contact-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.flock-contact-score {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 20px;
+  padding: 0 6px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--score-color, var(--flock-amber));
+  border-radius: 2px;
+  font-family: var(--flock-font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--score-color, var(--flock-amber));
+  text-shadow: 0 0 8px var(--score-color, var(--flock-amber));
+  box-shadow: 0 0 6px color-mix(in srgb, var(--score-color, var(--flock-amber)) 30%, transparent);
+}
+
+/* Score section in detail panel */
+.flock-score-section {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.05) 0%, transparent 50%);
+  border: 1px solid var(--flock-border);
+  border-radius: var(--flock-radius-md);
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.flock-score-display {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.flock-score-main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 80px;
+  padding: 12px;
+  background: var(--flock-bg-tertiary);
+  border: 2px solid var(--score-color, var(--flock-amber));
+  border-radius: var(--flock-radius-md);
+  box-shadow: 0 0 20px color-mix(in srgb, var(--score-color, var(--flock-amber)) 30%, transparent);
+}
+
+.flock-score-number {
+  font-family: var(--flock-font-mono);
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--score-color, var(--flock-amber));
+  text-shadow: 0 0 15px var(--score-color, var(--flock-amber));
+  line-height: 1;
+}
+
+.flock-score-label {
+  font-family: var(--flock-font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--flock-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 4px;
+}
+
+.flock-score-breakdown {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.flock-score-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.flock-score-bar-label {
+  width: 75px;
+  font-family: var(--flock-font-mono);
+  font-size: 9px;
+  font-weight: 500;
+  color: var(--flock-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.flock-score-bar-track {
+  flex: 1;
+  height: 6px;
+  background: var(--flock-bg-tertiary);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.flock-score-bar-fill {
+  height: 100%;
+  background: var(--bar-color, var(--flock-amber));
+  border-radius: 3px;
+  box-shadow: 0 0 8px color-mix(in srgb, var(--bar-color, var(--flock-amber)) 50%, transparent);
+  transition: width 0.5s ease-out;
+}
+
+.flock-score-bar-value {
+  width: 24px;
+  font-family: var(--flock-font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--flock-text-secondary);
+  text-align: right;
+}
+
+/* Score color tiers */
+.flock-contact-card[data-score] .flock-contact-score {
+  animation: flock-score-glow 2s ease-in-out infinite;
+}
+
+@keyframes flock-score-glow {
+  0%, 100% { opacity: 0.9; }
+  50% { opacity: 1; }
+}
