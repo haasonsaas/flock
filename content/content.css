@@ -1,201 +1,176 @@
 /**
  * Flock Content Styles
- * Deeply integrated with Twitter's UI
+ * Twitter-native styling with Flock's amber accent
  */
 
 /* ================================
-   CSS VARIABLES
+   MAIN BUTTON
+   Matches Twitter's button style
    ================================ */
-:root {
-  --flock-amber: #F59E0B;
-  --flock-amber-hover: #D97706;
-  --flock-amber-light: rgba(245, 158, 11, 0.15);
-  --flock-amber-glow: rgba(245, 158, 11, 0.3);
-
-  --flock-success: #10B981;
-  --flock-warning: #F59E0B;
-  --flock-error: #EF4444;
-  --flock-info: #3B82F6;
-
-  --flock-bg-primary: #000000;
-  --flock-bg-secondary: #16181C;
-  --flock-bg-tertiary: #1D1F23;
-  --flock-bg-elevated: #202327;
-
-  --flock-border: rgba(255, 255, 255, 0.1);
-  --flock-border-subtle: rgba(255, 255, 255, 0.05);
-
-  --flock-text-primary: #E7E9EA;
-  --flock-text-secondary: #71767B;
-  --flock-text-tertiary: #536471;
-
-  --flock-font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --flock-font-mono: "SF Mono", "Roboto Mono", "IBM Plex Mono", monospace;
-
-  --flock-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
-  --flock-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
-  --flock-shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.6);
-  --flock-shadow-glow: 0 0 20px var(--flock-amber-glow);
-
-  --flock-radius-sm: 4px;
-  --flock-radius-md: 8px;
-  --flock-radius-lg: 16px;
-  --flock-radius-full: 9999px;
-
-  --flock-transition: 150ms cubic-bezier(0.4, 0, 0.2, 1);
-  --flock-transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* ================================
-   SAVE BUTTON (Profile Page)
-   ================================ */
-.flock-save-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 16px;
-  height: 36px;
-  background: transparent;
-  border: 1px solid var(--flock-amber);
-  border-radius: var(--flock-radius-full);
-  color: var(--flock-amber);
-  font-family: var(--flock-font-sans);
-  font-size: 15px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all var(--flock-transition);
-  white-space: nowrap;
-  user-select: none;
-}
-
-.flock-save-btn:hover {
-  background: var(--flock-amber-light);
-}
-
-.flock-save-btn:active {
-  transform: scale(0.96);
-}
-
-.flock-save-btn.flock-saved {
-  background: var(--flock-amber);
-  color: #000;
-  border-color: var(--flock-amber);
-}
-
-.flock-save-btn.flock-saved:hover {
-  background: var(--flock-amber-hover);
-  border-color: var(--flock-amber-hover);
-}
-
-.flock-save-btn-icon {
-  width: 18px;
-  height: 18px;
+.flock-btn {
+  all: unset;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  margin-bottom: 12px;
+  margin-right: 8px;
+  background: transparent;
+  border: 1px solid rgb(83, 100, 113);
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: all 150ms ease;
 }
 
-.flock-save-btn-icon svg {
-  width: 16px;
-  height: 16px;
-  fill: currentColor;
+.flock-btn svg {
+  width: 18px;
+  height: 18px;
+  stroke: rgb(113, 118, 123);
+  fill: none;
+  transition: all 150ms ease;
 }
 
-/* Loading state */
-.flock-save-btn.flock-loading {
-  pointer-events: none;
-  opacity: 0.7;
+.flock-btn:hover {
+  background: rgba(245, 158, 11, 0.1);
+  border-color: rgba(245, 158, 11, 0.5);
 }
 
-.flock-save-btn.flock-loading .flock-save-btn-icon svg {
-  animation: flock-spin 0.8s linear infinite;
+.flock-btn:hover svg {
+  stroke: #F59E0B;
 }
 
+.flock-btn:active {
+  transform: scale(0.95);
+}
+
+/* Saved state */
+.flock-btn.flock-saved {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: #F59E0B;
+}
+
+.flock-btn.flock-saved svg {
+  stroke: #F59E0B;
+  fill: #F59E0B;
+}
+
+.flock-btn.flock-saved:hover {
+  background: rgba(245, 158, 11, 0.25);
+}
+
+/* ================================
+   DROPDOWN MENU
+   Twitter-style with Flock branding
+   ================================ */
+.flock-dropdown {
+  position: fixed;
+  z-index: 10000;
+  min-width: 200px;
+  background: rgb(22, 24, 28);
+  border: 1px solid rgb(47, 51, 54);
+  border-radius: 16px;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.04),
+    0 8px 40px rgba(0, 0, 0, 0.7);
+  overflow: hidden;
+  animation: flock-dropdown-in 150ms cubic-bezier(0.2, 0, 0.13, 1.5);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+@keyframes flock-dropdown-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.flock-dropdown-header {
+  padding: 12px 16px;
+  font-size: 13px;
+  font-weight: 800;
+  color: #F59E0B;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid rgb(47, 51, 54);
+}
+
+.flock-dropdown-item {
+  all: unset;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 16px;
+  box-sizing: border-box;
+  font-size: 15px;
+  font-weight: 400;
+  color: rgb(231, 233, 234);
+  cursor: pointer;
+  transition: background 100ms ease;
+}
+
+.flock-dropdown-item:hover {
+  background: rgb(30, 33, 36);
+}
+
+.flock-dropdown-item svg {
+  width: 18px;
+  height: 18px;
+  fill: rgb(113, 118, 123);
+  flex-shrink: 0;
+}
+
+.flock-dropdown-item:hover svg {
+  fill: rgb(231, 233, 234);
+}
+
+.flock-dropdown-divider {
+  height: 1px;
+  background: rgb(47, 51, 54);
+  margin: 4px 0;
+}
+
+.flock-dropdown-item.flock-primary {
+  color: #F59E0B;
+  font-weight: 700;
+}
+
+.flock-dropdown-item.flock-primary svg {
+  fill: #F59E0B;
+}
+
+.flock-dropdown-item.flock-danger {
+  color: rgb(244, 33, 46);
+}
+
+.flock-dropdown-item.flock-danger svg {
+  fill: rgb(244, 33, 46);
+}
+
+.flock-dropdown-item.flock-danger:hover {
+  background: rgba(244, 33, 46, 0.1);
+}
+
+/* Spinner */
 @keyframes flock-spin {
-  from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
 
-/* ================================
-   SAVED INDICATOR (Badge on profile)
-   ================================ */
-.flock-saved-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  background: var(--flock-amber-light);
-  border-radius: var(--flock-radius-full);
-  color: var(--flock-amber);
-  font-family: var(--flock-font-sans);
-  font-size: 12px;
-  font-weight: 600;
-  margin-left: 8px;
-}
-
-.flock-saved-badge svg {
-  width: 12px;
-  height: 12px;
-  fill: currentColor;
+.flock-dropdown-item svg circle {
+  animation: flock-spin 0.8s linear infinite;
+  transform-origin: center;
 }
 
 /* ================================
-   QUICK ACTIONS TOOLTIP
-   ================================ */
-.flock-quick-actions {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  background: var(--flock-bg-elevated);
-  border: 1px solid var(--flock-border);
-  border-radius: var(--flock-radius-lg);
-  box-shadow: var(--flock-shadow-lg);
-  padding: 8px;
-  min-width: 200px;
-  z-index: 10000;
-  opacity: 0;
-  visibility: hidden;
-  transform: translateY(-8px);
-  transition: all var(--flock-transition);
-}
-
-.flock-quick-actions.flock-visible {
-  opacity: 1;
-  visibility: visible;
-  transform: translateY(0);
-}
-
-.flock-quick-actions-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  border-radius: var(--flock-radius-md);
-  color: var(--flock-text-primary);
-  font-family: var(--flock-font-sans);
-  font-size: 14px;
-  cursor: pointer;
-  transition: background var(--flock-transition);
-}
-
-.flock-quick-actions-item:hover {
-  background: var(--flock-bg-tertiary);
-}
-
-.flock-quick-actions-item svg {
-  width: 18px;
-  height: 18px;
-  fill: var(--flock-text-secondary);
-}
-
-.flock-quick-actions-divider {
-  height: 1px;
-  background: var(--flock-border);
-  margin: 8px 0;
-}
-
-/* ================================
-   SIDEBAR OVERLAY
+   SIDEBAR
    ================================ */
 .flock-sidebar {
   position: fixed;
@@ -203,28 +178,28 @@
   right: 0;
   width: 380px;
   height: 100vh;
-  background: var(--flock-bg-primary);
-  border-left: 1px solid var(--flock-border);
+  background: rgb(0, 0, 0);
+  border-left: 1px solid rgb(47, 51, 54);
   z-index: 9999;
   transform: translateX(100%);
-  transition: transform var(--flock-transition-slow);
+  transition: transform 300ms cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
   flex-direction: column;
-  font-family: var(--flock-font-sans);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color: rgb(231, 233, 234);
 }
 
 .flock-sidebar.flock-open {
   transform: translateX(0);
 }
 
-/* Sidebar Header */
 .flock-sidebar-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 16px 20px;
-  border-bottom: 1px solid var(--flock-border);
-  background: var(--flock-bg-secondary);
+  border-bottom: 1px solid rgb(47, 51, 54);
+  background: rgb(22, 24, 28);
 }
 
 .flock-sidebar-title {
@@ -232,49 +207,44 @@
   align-items: center;
   gap: 10px;
   font-size: 18px;
-  font-weight: 700;
-  color: var(--flock-text-primary);
+  font-weight: 800;
 }
 
 .flock-sidebar-title svg {
   width: 24px;
   height: 24px;
-  fill: var(--flock-amber);
+  fill: #F59E0B;
 }
 
 .flock-sidebar-close {
+  all: unset;
   display: flex;
   align-items: center;
   justify-content: center;
   width: 36px;
   height: 36px;
-  border-radius: var(--flock-radius-full);
-  background: transparent;
-  border: none;
-  color: var(--flock-text-secondary);
+  border-radius: 9999px;
   cursor: pointer;
-  transition: all var(--flock-transition);
+  transition: background 150ms;
 }
 
 .flock-sidebar-close:hover {
-  background: var(--flock-bg-tertiary);
-  color: var(--flock-text-primary);
+  background: rgb(39, 44, 48);
 }
 
 .flock-sidebar-close svg {
   width: 20px;
   height: 20px;
-  fill: currentColor;
+  fill: rgb(113, 118, 123);
 }
 
-/* Sidebar Content */
 .flock-sidebar-content {
   flex: 1;
   overflow-y: auto;
   padding: 20px;
 }
 
-/* Profile Section in Sidebar */
+/* Profile Section */
 .flock-profile-section {
   display: flex;
   flex-direction: column;
@@ -289,9 +259,9 @@
 .flock-profile-avatar {
   width: 64px;
   height: 64px;
-  border-radius: var(--flock-radius-full);
+  border-radius: 9999px;
   object-fit: cover;
-  background: var(--flock-bg-tertiary);
+  background: rgb(39, 44, 48);
 }
 
 .flock-profile-info {
@@ -301,20 +271,18 @@
 
 .flock-profile-name {
   font-size: 18px;
-  font-weight: 700;
-  color: var(--flock-text-primary);
+  font-weight: 800;
   line-height: 1.3;
 }
 
 .flock-profile-username {
   font-size: 14px;
-  color: var(--flock-text-secondary);
+  color: rgb(113, 118, 123);
   margin-top: 2px;
 }
 
 .flock-profile-bio {
   font-size: 14px;
-  color: var(--flock-text-primary);
   line-height: 1.5;
   margin-top: 12px;
 }
@@ -332,31 +300,31 @@
 }
 
 .flock-stat-value {
-  font-family: var(--flock-font-mono);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 14px;
-  font-weight: 600;
-  color: var(--flock-text-primary);
+  font-weight: 700;
 }
 
 .flock-stat-label {
   font-size: 13px;
-  color: var(--flock-text-secondary);
+  color: rgb(113, 118, 123);
 }
 
-/* Pipeline Stage Selector */
+/* Section Labels */
+.flock-section-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: rgb(113, 118, 123);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 10px;
+}
+
+/* Pipeline Stages */
 .flock-pipeline-section {
   margin-top: 24px;
   padding-top: 20px;
-  border-top: 1px solid var(--flock-border-subtle);
-}
-
-.flock-section-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--flock-text-tertiary);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 10px;
+  border-top: 1px solid rgb(47, 51, 54);
 }
 
 .flock-pipeline-stages {
@@ -366,29 +334,28 @@
 }
 
 .flock-pipeline-stage {
+  all: unset;
   padding: 6px 14px;
-  border-radius: var(--flock-radius-full);
+  border-radius: 9999px;
   font-size: 13px;
   font-weight: 500;
-  background: var(--flock-bg-tertiary);
-  color: var(--flock-text-secondary);
-  border: 1px solid transparent;
+  background: rgb(39, 44, 48);
+  color: rgb(113, 118, 123);
   cursor: pointer;
-  transition: all var(--flock-transition);
+  transition: all 150ms;
 }
 
 .flock-pipeline-stage:hover {
-  background: var(--flock-bg-elevated);
-  color: var(--flock-text-primary);
+  background: rgb(47, 51, 54);
+  color: rgb(231, 233, 234);
 }
 
 .flock-pipeline-stage.flock-active {
-  background: var(--flock-amber-light);
-  color: var(--flock-amber);
-  border-color: var(--flock-amber);
+  background: rgba(245, 158, 11, 0.15);
+  color: #F59E0B;
 }
 
-/* Tags Section */
+/* Tags */
 .flock-tags-section {
   margin-top: 20px;
 }
@@ -397,7 +364,6 @@
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-top: 8px;
 }
 
 .flock-tag {
@@ -405,31 +371,26 @@
   align-items: center;
   gap: 4px;
   padding: 4px 10px;
-  background: var(--flock-bg-tertiary);
-  border-radius: var(--flock-radius-full);
+  background: rgb(39, 44, 48);
+  border-radius: 9999px;
   font-size: 12px;
-  color: var(--flock-text-primary);
-  cursor: default;
 }
 
 .flock-tag-remove {
+  all: unset;
   display: flex;
   align-items: center;
   justify-content: center;
   width: 14px;
   height: 14px;
-  border-radius: var(--flock-radius-full);
-  background: transparent;
-  border: none;
-  color: var(--flock-text-tertiary);
+  border-radius: 9999px;
+  color: rgb(113, 118, 123);
   cursor: pointer;
-  margin-left: 2px;
-  transition: all var(--flock-transition);
 }
 
 .flock-tag-remove:hover {
   background: rgba(255, 255, 255, 0.1);
-  color: var(--flock-text-primary);
+  color: rgb(231, 233, 234);
 }
 
 .flock-tag-remove svg {
@@ -439,22 +400,21 @@
 }
 
 .flock-add-tag {
+  all: unset;
   display: inline-flex;
   align-items: center;
   gap: 4px;
   padding: 4px 10px;
-  background: transparent;
-  border: 1px dashed var(--flock-border);
-  border-radius: var(--flock-radius-full);
+  border: 1px dashed rgb(47, 51, 54);
+  border-radius: 9999px;
   font-size: 12px;
-  color: var(--flock-text-tertiary);
+  color: rgb(113, 118, 123);
   cursor: pointer;
-  transition: all var(--flock-transition);
 }
 
 .flock-add-tag:hover {
-  border-color: var(--flock-amber);
-  color: var(--flock-amber);
+  border-color: #F59E0B;
+  color: #F59E0B;
 }
 
 .flock-add-tag svg {
@@ -463,40 +423,40 @@
   fill: currentColor;
 }
 
-/* Notes Section */
+/* Notes */
 .flock-notes-section {
   margin-top: 20px;
 }
 
 .flock-notes-textarea {
+  all: unset;
+  box-sizing: border-box;
   width: 100%;
   min-height: 100px;
   padding: 12px;
-  background: var(--flock-bg-tertiary);
-  border: 1px solid var(--flock-border);
-  border-radius: var(--flock-radius-md);
-  color: var(--flock-text-primary);
-  font-family: var(--flock-font-sans);
+  background: rgb(39, 44, 48);
+  border: 1px solid rgb(47, 51, 54);
+  border-radius: 12px;
   font-size: 14px;
   line-height: 1.5;
   resize: vertical;
-  transition: border-color var(--flock-transition);
+  display: block;
 }
 
 .flock-notes-textarea:focus {
+  border-color: #F59E0B;
   outline: none;
-  border-color: var(--flock-amber);
 }
 
 .flock-notes-textarea::placeholder {
-  color: var(--flock-text-tertiary);
+  color: rgb(113, 118, 123);
 }
 
-/* Interactions Timeline */
+/* Interactions */
 .flock-interactions-section {
   margin-top: 24px;
   padding-top: 20px;
-  border-top: 1px solid var(--flock-border-subtle);
+  border-top: 1px solid rgb(47, 51, 54);
 }
 
 .flock-interactions-header {
@@ -507,28 +467,21 @@
 }
 
 .flock-add-interaction {
+  all: unset;
   display: flex;
   align-items: center;
   gap: 4px;
   padding: 4px 10px;
-  background: transparent;
-  border: 1px solid var(--flock-border);
-  border-radius: var(--flock-radius-full);
+  border: 1px solid rgb(47, 51, 54);
+  border-radius: 9999px;
   font-size: 12px;
-  color: var(--flock-text-secondary);
+  color: rgb(113, 118, 123);
   cursor: pointer;
-  transition: all var(--flock-transition);
 }
 
 .flock-add-interaction:hover {
-  border-color: var(--flock-amber);
-  color: var(--flock-amber);
-}
-
-.flock-add-interaction svg {
-  width: 12px;
-  height: 12px;
-  fill: currentColor;
+  border-color: #F59E0B;
+  color: #F59E0B;
 }
 
 .flock-interaction-list {
@@ -541,8 +494,8 @@
   display: flex;
   gap: 12px;
   padding: 12px;
-  background: var(--flock-bg-secondary);
-  border-radius: var(--flock-radius-md);
+  background: rgb(22, 24, 28);
+  border-radius: 12px;
 }
 
 .flock-interaction-icon {
@@ -551,27 +504,15 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--flock-radius-full);
-  background: var(--flock-bg-tertiary);
+  border-radius: 9999px;
+  background: rgb(39, 44, 48);
   flex-shrink: 0;
 }
 
 .flock-interaction-icon svg {
   width: 16px;
   height: 16px;
-  fill: var(--flock-text-secondary);
-}
-
-.flock-interaction-icon.flock-type-note svg {
-  fill: var(--flock-info);
-}
-
-.flock-interaction-icon.flock-type-dm svg {
-  fill: var(--flock-success);
-}
-
-.flock-interaction-icon.flock-type-reply svg {
-  fill: var(--flock-amber);
+  fill: rgb(113, 118, 123);
 }
 
 .flock-interaction-content {
@@ -581,7 +522,6 @@
 
 .flock-interaction-text {
   font-size: 14px;
-  color: var(--flock-text-primary);
   line-height: 1.4;
 }
 
@@ -591,7 +531,7 @@
   gap: 8px;
   margin-top: 6px;
   font-size: 12px;
-  color: var(--flock-text-tertiary);
+  color: rgb(113, 118, 123);
 }
 
 .flock-interaction-type {
@@ -600,7 +540,7 @@
 }
 
 .flock-interaction-time {
-  font-family: var(--flock-font-mono);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 /* Empty State */
@@ -616,14 +556,35 @@
 .flock-empty-state svg {
   width: 48px;
   height: 48px;
-  fill: var(--flock-text-tertiary);
+  fill: rgb(113, 118, 123);
   margin-bottom: 16px;
 }
 
 .flock-empty-state-text {
   font-size: 14px;
-  color: var(--flock-text-secondary);
+  color: rgb(113, 118, 123);
   line-height: 1.5;
+}
+
+/* Loading */
+.flock-loading {
+  color: rgb(113, 118, 123);
+}
+
+/* Animation */
+.flock-animate-in {
+  animation: flock-fade-up 300ms ease-out;
+}
+
+@keyframes flock-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* ================================
@@ -637,6 +598,7 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  pointer-events: none;
 }
 
 .flock-toast {
@@ -644,18 +606,19 @@
   align-items: center;
   gap: 12px;
   padding: 14px 18px;
-  background: var(--flock-bg-elevated);
-  border: 1px solid var(--flock-border);
-  border-radius: var(--flock-radius-md);
-  box-shadow: var(--flock-shadow-lg);
-  color: var(--flock-text-primary);
-  font-family: var(--flock-font-sans);
+  background: rgb(22, 24, 28);
+  border: 1px solid rgb(47, 51, 54);
+  border-radius: 12px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+  color: rgb(231, 233, 234);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   font-size: 14px;
-  animation: flock-toast-in 0.3s ease-out;
+  pointer-events: auto;
+  animation: flock-toast-in 300ms ease-out;
 }
 
 .flock-toast.flock-toast-out {
-  animation: flock-toast-out 0.2s ease-in forwards;
+  animation: flock-toast-out 200ms ease-in forwards;
 }
 
 .flock-toast-icon {
@@ -671,21 +634,9 @@
   height: 20px;
 }
 
-.flock-toast.flock-success .flock-toast-icon svg {
-  fill: var(--flock-success);
-}
-
-.flock-toast.flock-error .flock-toast-icon svg {
-  fill: var(--flock-error);
-}
-
-.flock-toast.flock-warning .flock-toast-icon svg {
-  fill: var(--flock-warning);
-}
-
-.flock-toast.flock-info .flock-toast-icon svg {
-  fill: var(--flock-info);
-}
+.flock-toast.flock-success .flock-toast-icon svg { fill: #10B981; }
+.flock-toast.flock-error .flock-toast-icon svg { fill: #EF4444; }
+.flock-toast.flock-warning .flock-toast-icon svg { fill: #F59E0B; }
 
 @keyframes flock-toast-in {
   from {
@@ -709,236 +660,10 @@
   }
 }
 
-/* ================================
-   MODAL
-   ================================ */
-.flock-modal-backdrop {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(4px);
-  z-index: 100001;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0;
-  visibility: hidden;
-  transition: all var(--flock-transition);
-}
-
-.flock-modal-backdrop.flock-visible {
-  opacity: 1;
-  visibility: visible;
-}
-
-.flock-modal {
-  background: var(--flock-bg-secondary);
-  border: 1px solid var(--flock-border);
-  border-radius: var(--flock-radius-lg);
-  box-shadow: var(--flock-shadow-lg);
-  width: 90%;
-  max-width: 400px;
-  transform: scale(0.95);
-  transition: transform var(--flock-transition);
-}
-
-.flock-modal-backdrop.flock-visible .flock-modal {
-  transform: scale(1);
-}
-
-.flock-modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--flock-border-subtle);
-}
-
-.flock-modal-title {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--flock-text-primary);
-}
-
-.flock-modal-close {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: var(--flock-radius-full);
-  background: transparent;
-  border: none;
-  color: var(--flock-text-secondary);
-  cursor: pointer;
-  transition: all var(--flock-transition);
-}
-
-.flock-modal-close:hover {
-  background: var(--flock-bg-tertiary);
-  color: var(--flock-text-primary);
-}
-
-.flock-modal-close svg {
-  width: 18px;
-  height: 18px;
-  fill: currentColor;
-}
-
-.flock-modal-body {
-  padding: 20px;
-}
-
-.flock-modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  padding: 16px 20px;
-  border-top: 1px solid var(--flock-border-subtle);
-}
-
-/* Form Elements */
-.flock-input {
-  width: 100%;
-  padding: 10px 14px;
-  background: var(--flock-bg-tertiary);
-  border: 1px solid var(--flock-border);
-  border-radius: var(--flock-radius-md);
-  color: var(--flock-text-primary);
-  font-family: var(--flock-font-sans);
-  font-size: 14px;
-  transition: border-color var(--flock-transition);
-}
-
-.flock-input:focus {
-  outline: none;
-  border-color: var(--flock-amber);
-}
-
-.flock-input::placeholder {
-  color: var(--flock-text-tertiary);
-}
-
-.flock-select {
-  width: 100%;
-  padding: 10px 14px;
-  background: var(--flock-bg-tertiary);
-  border: 1px solid var(--flock-border);
-  border-radius: var(--flock-radius-md);
-  color: var(--flock-text-primary);
-  font-family: var(--flock-font-sans);
-  font-size: 14px;
-  cursor: pointer;
-  transition: border-color var(--flock-transition);
-}
-
-.flock-select:focus {
-  outline: none;
-  border-color: var(--flock-amber);
-}
-
-.flock-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 10px 20px;
-  border-radius: var(--flock-radius-full);
-  font-family: var(--flock-font-sans);
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all var(--flock-transition);
-  border: none;
-}
-
-.flock-btn-primary {
-  background: var(--flock-amber);
-  color: #000;
-}
-
-.flock-btn-primary:hover {
-  background: var(--flock-amber-hover);
-}
-
-.flock-btn-secondary {
-  background: transparent;
-  color: var(--flock-text-primary);
-  border: 1px solid var(--flock-border);
-}
-
-.flock-btn-secondary:hover {
-  background: var(--flock-bg-tertiary);
-}
-
-.flock-btn-ghost {
-  background: transparent;
-  color: var(--flock-text-secondary);
-}
-
-.flock-btn-ghost:hover {
-  background: var(--flock-bg-tertiary);
-  color: var(--flock-text-primary);
-}
-
-/* ================================
-   FLOATING ACTION BUTTON
-   ================================ */
-.flock-fab {
-  position: fixed;
-  bottom: 24px;
-  left: 24px;
-  width: 56px;
-  height: 56px;
-  border-radius: var(--flock-radius-full);
-  background: var(--flock-amber);
-  border: none;
-  box-shadow: var(--flock-shadow-md), var(--flock-shadow-glow);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all var(--flock-transition);
-  z-index: 9998;
-}
-
-.flock-fab:hover {
-  background: var(--flock-amber-hover);
-  transform: scale(1.05);
-}
-
-.flock-fab:active {
-  transform: scale(0.95);
-}
-
-.flock-fab svg {
-  width: 24px;
-  height: 24px;
-  fill: #000;
-}
-
-/* Saved contact indicator on timeline tweets */
-.flock-saved-indicator {
-  display: inline-flex;
-  align-items: center;
-  margin-left: 4px;
-}
-
-.flock-saved-indicator svg {
-  width: 14px;
-  height: 14px;
-  fill: var(--flock-amber);
-}
-
-/* ================================
-   SCROLLBAR STYLING
-   ================================ */
+/* Scrollbar */
 .flock-sidebar::-webkit-scrollbar,
 .flock-sidebar-content::-webkit-scrollbar {
-  width: 8px;
+  width: 6px;
 }
 
 .flock-sidebar::-webkit-scrollbar-track,
@@ -948,38 +673,11 @@
 
 .flock-sidebar::-webkit-scrollbar-thumb,
 .flock-sidebar-content::-webkit-scrollbar-thumb {
-  background: var(--flock-bg-tertiary);
-  border-radius: 4px;
+  background: rgb(39, 44, 48);
+  border-radius: 3px;
 }
 
 .flock-sidebar::-webkit-scrollbar-thumb:hover,
 .flock-sidebar-content::-webkit-scrollbar-thumb:hover {
-  background: var(--flock-bg-elevated);
-}
-
-/* ================================
-   ANIMATIONS
-   ================================ */
-@keyframes flock-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
-
-.flock-loading {
-  animation: flock-pulse 1.5s ease-in-out infinite;
-}
-
-@keyframes flock-slide-up {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.flock-animate-in {
-  animation: flock-slide-up 0.3s ease-out;
+  background: rgb(47, 51, 54);
 }

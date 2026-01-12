@@ -7,14 +7,18 @@
 // ICONS (inline for content script)
 // ================================
 const Icons = {
-  logo: `<svg viewBox="0 0 24 24"><path d="M21.5 6.5c-.5.5-1.5 1-3 1.5.5 1.5.5 3 0 4.5-.5 1.5-1.5 3-3 4.5-1.5 1.5-3.5 2.5-6 3-2.5.5-5 .5-7.5-.5 2 0 3.5-.5 5-1.5-1.5 0-2.5-.5-3.5-1.5 1 0 2-.5 2.5-1-1.5-.5-2.5-1.5-3-2.5 1 .5 2 .5 2.5.5C4 12 3 10.5 3 8.5c.5.5 1.5.5 2 .5-1.5-1-2-2.5-2-4.5 0-.5 0-1 .5-1.5 2 2.5 4.5 4 8 4.5 0-.5-.5-1-.5-1.5 0-2 1.5-3.5 3.5-3.5 1 0 2 .5 2.5 1 1-.5 2-.5 2.5-1-.5 1-.5 2-1.5 2.5 1 0 2-.5 2.5-.5-.5 1-1 1.5-2 2z" fill="currentColor"/></svg>`,
-  check: `<svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>`,
+  // Bookmark icons for main button
+  bookmark: `<svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" stroke="currentColor" fill="none"/></svg>`,
+  bookmarkFilled: `<svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" fill="currentColor" stroke="currentColor"/></svg>`,
+  check: `<svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>`,
   close: `<svg viewBox="0 0 24 24"><path d="M6 6l12 12M6 18L18 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>`,
-  plus: `<svg viewBox="0 0 24 24"><path d="M12 4v16m-8-8h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>`,
+  plus: `<svg viewBox="0 0 24 24"><path d="M12 5v14m-7-7h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>`,
   note: `<svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z" stroke="currentColor" stroke-width="2" fill="none"/><path d="M8 8h8M8 12h8M8 16h4" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>`,
   message: `<svg viewBox="0 0 24 24"><path d="M21 12c0 4.5-4 8-9 8-1.5 0-3-.5-4-1l-5 1 1-4c-1-1-2-3-2-4 0-4.5 4-8 9-8s9 3.5 9 8z" stroke="currentColor" stroke-width="2" fill="none"/></svg>`,
   spinner: `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none" opacity="0.25"/><path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>`,
   success: `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none"/><path d="M8 12l3 3 5-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>`,
+  // Flock logo for sidebar header
+  logo: `<svg viewBox="0 0 24 24"><path d="M21.5 6.5c-.5.5-1.5 1-3 1.5.5 1.5.5 3 0 4.5-.5 1.5-1.5 3-3 4.5-1.5 1.5-3.5 2.5-6 3-2.5.5-5 .5-7.5-.5 2 0 3.5-.5 5-1.5-1.5 0-2.5-.5-3.5-1.5 1 0 2-.5 2.5-1-1.5-.5-2.5-1.5-3-2.5 1 .5 2 .5 2.5.5C4 12 3 10.5 3 8.5c.5.5 1.5.5 2 .5-1.5-1-2-2.5-2-4.5 0-.5 0-1 .5-1.5 2 2.5 4.5 4 8 4.5 0-.5-.5-1-.5-1.5 0-2 1.5-3.5 3.5-3.5 1 0 2 .5 2.5 1 1-.5 2-.5 2.5-1-.5 1-.5 2-1.5 2.5 1 0 2-.5 2.5-.5-.5 1-1 1.5-2 2z" fill="currentColor"/></svg>`,
 };
 
 // ================================
@@ -594,21 +598,35 @@ class FlockSidebar {
 const sidebar = new FlockSidebar();
 
 // ================================
-// SAVE BUTTON INJECTION
+// SAVE BUTTON - Twitter-native styling
 // ================================
+
+let activeDropdown = null;
+
+function closeActiveDropdown() {
+  if (activeDropdown) {
+    activeDropdown.remove();
+    activeDropdown = null;
+  }
+  document.removeEventListener('click', handleOutsideClick);
+}
+
+function handleOutsideClick(e) {
+  if (activeDropdown && !activeDropdown.contains(e.target) && !e.target.closest('.flock-btn')) {
+    closeActiveDropdown();
+  }
+}
 
 async function injectSaveButton() {
   if (!TwitterParser.isProfilePage()) return;
-  if (document.querySelector('.flock-save-btn')) return;
+  if (document.querySelector('.flock-btn')) return;
 
   const username = TwitterParser.getCurrentUsername();
   if (!username) return;
 
-  // Find a good place to inject the button
-  // Look for the follow button area
+  // Find the user actions area (where Follow button is)
   const userActions = document.querySelector('[data-testid="userActions"]');
   if (!userActions) {
-    // Try again later
     setTimeout(injectSaveButton, 500);
     return;
   }
@@ -617,62 +635,116 @@ async function injectSaveButton() {
   const existingContact = await getContact(username);
   const isSaved = !!existingContact;
 
-  // Create button
+  // Create button matching Twitter's button style
   const btn = document.createElement('button');
-  btn.className = `flock-save-btn ${isSaved ? 'flock-saved' : ''}`;
-  btn.innerHTML = `
-    <span class="flock-save-btn-icon">${isSaved ? Icons.check : Icons.logo}</span>
-    <span>${isSaved ? 'Saved' : 'Save to Flock'}</span>
-  `;
+  btn.className = `flock-btn ${isSaved ? 'flock-saved' : ''}`;
+  btn.setAttribute('type', 'button');
+  btn.setAttribute('aria-label', isSaved ? 'Saved to Flock' : 'Save to Flock');
+  btn.innerHTML = isSaved ? Icons.bookmarkFilled : Icons.bookmark;
 
+  // Click handler - show dropdown
   btn.addEventListener('click', async (e) => {
     e.preventDefault();
     e.stopPropagation();
 
-    if (isSaved) {
-      // Open sidebar
-      sidebar.toggle(username);
-    } else {
-      // Save contact
-      btn.classList.add('flock-loading');
-      btn.innerHTML = `
-        <span class="flock-save-btn-icon">${Icons.spinner}</span>
-        <span>Saving...</span>
-      `;
-
-      try {
-        const profileData = TwitterParser.extractProfileData();
-        await saveContact(profileData);
-
-        btn.classList.remove('flock-loading');
-        btn.classList.add('flock-saved');
-        btn.innerHTML = `
-          <span class="flock-save-btn-icon">${Icons.check}</span>
-          <span>Saved</span>
-        `;
-
-        showToast(`Saved @${username} to Flock`, 'success');
-
-        // Now clicking opens sidebar
-        btn.onclick = (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          sidebar.toggle(username);
-        };
-      } catch (error) {
-        console.error('[Flock] Error saving contact:', error);
-        btn.classList.remove('flock-loading');
-        btn.innerHTML = `
-          <span class="flock-save-btn-icon">${Icons.logo}</span>
-          <span>Save to Flock</span>
-        `;
-        showToast('Failed to save contact', 'error');
-      }
+    if (activeDropdown) {
+      closeActiveDropdown();
+      return;
     }
+
+    const contact = await getContact(username);
+    const dropdown = document.createElement('div');
+    dropdown.className = 'flock-dropdown';
+
+    if (contact) {
+      dropdown.innerHTML = `
+        <div class="flock-dropdown-header">Saved to Flock</div>
+        <button class="flock-dropdown-item" data-action="open">
+          ${Icons.note}
+          <span>View details</span>
+        </button>
+        <button class="flock-dropdown-item" data-action="stage">
+          ${Icons.check}
+          <span>Pipeline: ${contact.pipelineStage || 'new'}</span>
+        </button>
+        <button class="flock-dropdown-item" data-action="note">
+          ${Icons.plus}
+          <span>Quick note</span>
+        </button>
+        <div class="flock-dropdown-divider"></div>
+        <button class="flock-dropdown-item flock-danger" data-action="remove">
+          ${Icons.close}
+          <span>Remove</span>
+        </button>
+      `;
+    } else {
+      dropdown.innerHTML = `
+        <button class="flock-dropdown-item flock-primary" data-action="save">
+          ${Icons.plus}
+          <span>Save to Flock</span>
+        </button>
+      `;
+    }
+
+    // Position dropdown below button
+    const rect = btn.getBoundingClientRect();
+    dropdown.style.top = `${rect.bottom + 4}px`;
+    dropdown.style.left = `${Math.max(rect.left - 100, 10)}px`;
+
+    document.body.appendChild(dropdown);
+    activeDropdown = dropdown;
+
+    // Handle dropdown actions
+    dropdown.querySelectorAll('.flock-dropdown-item').forEach(item => {
+      item.addEventListener('click', async (ev) => {
+        ev.stopPropagation();
+        const action = item.dataset.action;
+
+        if (action === 'save') {
+          item.innerHTML = `${Icons.spinner}<span>Saving...</span>`;
+          try {
+            const profileData = TwitterParser.extractProfileData();
+            await saveContact(profileData);
+            btn.classList.add('flock-saved');
+            btn.innerHTML = Icons.bookmarkFilled;
+            showToast(`Saved @${username}`, 'success');
+          } catch (err) {
+            showToast('Failed to save', 'error');
+          }
+          closeActiveDropdown();
+        } else if (action === 'open') {
+          closeActiveDropdown();
+          sidebar.open(username);
+        } else if (action === 'note') {
+          closeActiveDropdown();
+          const note = prompt('Note:');
+          if (note) {
+            await logInteraction(username, 'note', note);
+            showToast('Note added', 'success');
+          }
+        } else if (action === 'stage') {
+          closeActiveDropdown();
+          const stages = ['new', 'contacted', 'engaged', 'qualified', 'won', 'lost'];
+          const newStage = prompt(`Stage (${stages.join('/')}):`);
+          if (newStage && stages.includes(newStage)) {
+            await updateContact(username, { pipelineStage: newStage });
+            showToast(`Moved to ${newStage}`, 'success');
+          }
+        } else if (action === 'remove') {
+          closeActiveDropdown();
+          btn.classList.remove('flock-saved');
+          btn.innerHTML = Icons.bookmark;
+          showToast('Removed', 'success');
+        }
+      });
+    });
+
+    setTimeout(() => document.addEventListener('click', handleOutsideClick), 0);
   });
 
-  // Insert before the first button in userActions
-  userActions.insertBefore(btn, userActions.firstChild);
+  // Insert at start of actions container (same row as other buttons)
+  const container = userActions.parentElement;
+  container.insertBefore(btn, container.firstChild);
 }
 
 // ================================
@@ -719,13 +791,14 @@ function observeNavigation() {
 
 function handleNavigation() {
   // Remove existing button
-  const existingBtn = document.querySelector('.flock-save-btn');
+  const existingBtn = document.querySelector('.flock-btn');
   if (existingBtn) existingBtn.remove();
 
-  // Close sidebar if open
+  // Close dropdown and sidebar
+  closeActiveDropdown();
   sidebar.close();
 
-  // Re-inject button if on profile page
+  // Re-inject if on profile page
   if (TwitterParser.isProfilePage()) {
     setTimeout(injectSaveButton, 500);
   }
@@ -744,9 +817,6 @@ async function init() {
 
     // Initial injection
     injectSaveButton();
-
-    // Create FAB (disabled for now - might be too intrusive)
-    // createFAB();
 
     // Observe navigation
     observeNavigation();
