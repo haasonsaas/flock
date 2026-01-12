@@ -1369,7 +1369,7 @@ async function renderNetworkView() {
   // Set canvas size
   const rect = container.getBoundingClientRect();
   canvas.width = rect.width;
-  canvas.height = rect.height - 50; // Subtract controls height
+  canvas.height = rect.height - 36; // Subtract controls height
 
   // Build nodes from contacts
   await buildNetworkNodes();

@@ -346,23 +346,31 @@ body {
    ================================ */
 .flock-tabs {
   display: flex;
-  gap: 4px;
-  padding: 0 16px 8px;
+  gap: 2px;
+  padding: 0 12px 8px;
   background: var(--flock-bg-primary);
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.flock-tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .flock-tab {
-  flex: 1;
-  padding: 7px 12px;
+  flex-shrink: 0;
+  padding: 6px 10px;
   border: none;
   background: transparent;
   border-radius: var(--flock-radius-full);
   color: var(--flock-text-secondary);
   font-family: var(--flock-font-sans);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   cursor: pointer;
   transition: all var(--flock-transition);
+  white-space: nowrap;
 }
 
 .flock-tab:hover {
@@ -2880,8 +2888,8 @@ body {
 .flock-network-controls {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
+  gap: 6px;
+  padding: 6px 12px;
   background: var(--flock-bg-primary);
   border-bottom: 1px solid var(--flock-border);
   z-index: 10;
@@ -2889,13 +2897,13 @@ body {
 
 .flock-network-filter {
   flex: 1;
-  padding: 6px 10px;
+  padding: 4px 8px;
   background: var(--flock-bg-secondary);
   border: 1px solid var(--flock-border);
-  border-radius: var(--flock-radius-md);
+  border-radius: var(--flock-radius-sm);
   color: var(--flock-text-primary);
   font-family: var(--flock-font-sans);
-  font-size: 12px;
+  font-size: 11px;
   cursor: pointer;
 }
 
@@ -2903,13 +2911,13 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   background: var(--flock-bg-secondary);
   border: 1px solid var(--flock-border);
-  border-radius: var(--flock-radius-md);
+  border-radius: var(--flock-radius-sm);
   color: var(--flock-text-secondary);
-  font-size: 16px;
+  font-size: 14px;
   cursor: pointer;
   transition: all var(--flock-transition);
 }
@@ -2964,14 +2972,13 @@ body {
 
 .flock-network-legend {
   position: absolute;
-  bottom: 10px;
-  left: 10px;
+  bottom: 6px;
+  left: 6px;
   display: flex;
-  flex-direction: column;
   gap: 8px;
-  padding: 10px 12px;
-  background: rgba(0, 0, 0, 0.7);
-  border-radius: var(--flock-radius-md);
+  padding: 6px 10px;
+  background: rgba(0, 0, 0, 0.8);
+  border-radius: var(--flock-radius-sm);
   backdrop-filter: blur(8px);
 }
 
@@ -2979,30 +2986,24 @@ body {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 
 .flock-legend-title {
-  font-size: 9px;
-  font-weight: 600;
-  color: var(--flock-text-tertiary);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  width: 100%;
-  margin-bottom: 2px;
+  display: none;
 }
 
 .flock-legend-item {
   display: flex;
   align-items: center;
-  gap: 4px;
-  font-size: 10px;
-  color: var(--flock-text-secondary);
+  gap: 3px;
+  font-size: 9px;
+  color: var(--flock-text-tertiary);
 }
 
 .flock-legend-dot {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
 }
 
