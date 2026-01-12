@@ -1159,6 +1159,44 @@ async function showContactDetail(username) {
         ` : ''}
       </div>
     ` : ''}
+    <div class="flock-detail-section flock-ai-section">
+      <h3>${Icons.sparkle} AI Insights</h3>
+      <div class="flock-ai-actions">
+        <button class="flock-ai-btn" id="getNextActionBtn">
+          <span class="flock-ai-btn-icon">🎯</span>
+          <span>Get Next Best Action</span>
+        </button>
+        <button class="flock-ai-btn" id="getHealthBtn">
+          <span class="flock-ai-btn-icon">💚</span>
+          <span>Analyze Relationship</span>
+        </button>
+        <button class="flock-ai-btn" id="getEventsBtn">
+          <span class="flock-ai-btn-icon">📅</span>
+          <span>Find Opportunities</span>
+        </button>
+      </div>
+      <div class="flock-ai-results" id="aiResults" style="display: none;">
+        <div class="flock-ai-loading" id="aiLoading" style="display: none;">
+          <div class="flock-spinner-small"></div>
+          <span>Analyzing...</span>
+        </div>
+        <div class="flock-ai-content" id="aiContent"></div>
+      </div>
+    </div>
+    ${contact.eventAnalysis?.detectedEvents?.length > 0 ? `
+      <div class="flock-detail-section flock-events-section">
+        <h3>📅 Detected Opportunities</h3>
+        <div class="flock-events-list">
+          ${contact.eventAnalysis.detectedEvents.slice(0, 3).map(event => `
+            <div class="flock-event-item flock-event-${event.priority || 'low'}">
+              <span class="flock-event-type">${event.type}</span>
+              <span class="flock-event-desc">${escapeHtml(event.description)}</span>
+              ${event.suggestedMessage ? `<p class="flock-event-message">"${escapeHtml(event.suggestedMessage)}"</p>` : ''}
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    ` : ''}
     <div class="flock-detail-meta">
       Added ${new Date(contact.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
     </div>
@@ -1167,6 +1205,153 @@ async function showContactDetail(username) {
   contactList.style.display = 'none';
   filterBar.style.display = 'none';
   panel.style.display = 'block';
+
+  // AI Insight button handlers
+  const aiResults = document.getElementById('aiResults');
+  const aiLoading = document.getElementById('aiLoading');
+  const aiContent = document.getElementById('aiContent');
+
+  document.getElementById('getNextActionBtn')?.addEventListener('click', async () => {
+    aiResults.style.display = 'block';
+    aiLoading.style.display = 'flex';
+    aiContent.innerHTML = '';
+
+    const response = await chrome.runtime.sendMessage({
+      action: 'getNextBestAction',
+      contact,
+      interactions: Object.values(interactions)
+    });
+
+    aiLoading.style.display = 'none';
+
+    if (response.success && response.data) {
+      const d = response.data;
+      aiContent.innerHTML = `
+        <div class="flock-ai-result flock-ai-action">
+          <div class="flock-ai-result-header">
+            <span class="flock-ai-urgency flock-urgency-${d.urgency}">${d.urgency} urgency</span>
+            <span class="flock-ai-timing">${d.timing}</span>
+          </div>
+          <p class="flock-ai-main">${escapeHtml(d.action)}</p>
+          <div class="flock-ai-channel">via <strong>${d.channel}</strong></div>
+          ${d.talkingPoints?.length ? `
+            <div class="flock-ai-points">
+              <strong>Talking Points:</strong>
+              <ul>${d.talkingPoints.map(p => `<li>${escapeHtml(p)}</li>`).join('')}</ul>
+            </div>
+          ` : ''}
+          ${d.messageTemplate ? `
+            <div class="flock-ai-template">
+              <strong>Draft Message:</strong>
+              <p class="flock-ai-draft">"${escapeHtml(d.messageTemplate)}"</p>
+            </div>
+          ` : ''}
+          <p class="flock-ai-risk">⚠️ ${escapeHtml(d.riskIfDelayed || 'No specific risk identified')}</p>
+        </div>
+      `;
+    } else {
+      aiContent.innerHTML = `<p class="flock-ai-error">Failed to analyze: ${escapeHtml(response.error || 'Unknown error')}</p>`;
+    }
+  });
+
+  document.getElementById('getHealthBtn')?.addEventListener('click', async () => {
+    aiResults.style.display = 'block';
+    aiLoading.style.display = 'flex';
+    aiContent.innerHTML = '';
+
+    const response = await chrome.runtime.sendMessage({
+      action: 'getConversationHealth',
+      contact,
+      interactions: Object.values(interactions)
+    });
+
+    aiLoading.style.display = 'none';
+
+    if (response.success && response.data) {
+      const d = response.data;
+      const healthColor = d.healthScore >= 70 ? '#10B981' : d.healthScore >= 40 ? '#F59E0B' : '#EF4444';
+      aiContent.innerHTML = `
+        <div class="flock-ai-result flock-ai-health">
+          <div class="flock-ai-health-score" style="--health-color: ${healthColor}">
+            <span class="flock-health-number">${d.healthScore}</span>
+            <span class="flock-health-label">Health Score</span>
+            <span class="flock-health-trend flock-trend-${d.healthTrend}">${d.healthTrend}</span>
+          </div>
+          <div class="flock-ai-prediction">
+            <strong>Prediction:</strong> ${d.stageProgression?.predictedNextStage || 'Unknown'}
+            <span class="flock-ai-prob">(${Math.round((d.stageProgression?.probability || 0) * 100)}% confidence)</span>
+          </div>
+          <div class="flock-ai-deal-prob">
+            <strong>Deal Probability:</strong> ${Math.round((d.dealProbability || 0) * 100)}%
+          </div>
+          <div class="flock-ai-churn flock-churn-${d.churnRisk}">
+            Churn Risk: <strong>${d.churnRisk}</strong>
+          </div>
+          ${d.riskFactors?.length ? `
+            <div class="flock-ai-risks">
+              <strong>⚠️ Risk Factors:</strong>
+              <ul>${d.riskFactors.map(r => `<li>${escapeHtml(r)}</li>`).join('')}</ul>
+            </div>
+          ` : ''}
+          ${d.positiveSignals?.length ? `
+            <div class="flock-ai-positives">
+              <strong>✅ Positive Signals:</strong>
+              <ul>${d.positiveSignals.map(s => `<li>${escapeHtml(s)}</li>`).join('')}</ul>
+            </div>
+          ` : ''}
+          <p class="flock-ai-focus"><strong>Focus:</strong> ${escapeHtml(d.recommendedFocus || 'No specific recommendation')}</p>
+        </div>
+      `;
+    } else {
+      aiContent.innerHTML = `<p class="flock-ai-error">Failed to analyze: ${escapeHtml(response.error || 'Unknown error')}</p>`;
+    }
+  });
+
+  document.getElementById('getEventsBtn')?.addEventListener('click', async () => {
+    aiResults.style.display = 'block';
+    aiLoading.style.display = 'flex';
+    aiContent.innerHTML = '';
+
+    const response = await chrome.runtime.sendMessage({
+      action: 'getEventOpportunities',
+      contact
+    });
+
+    aiLoading.style.display = 'none';
+
+    if (response.success && response.data) {
+      const d = response.data;
+      if (d.detectedEvents?.length > 0) {
+        aiContent.innerHTML = `
+          <div class="flock-ai-result flock-ai-events">
+            <strong>Detected Opportunities:</strong>
+            ${d.detectedEvents.map(e => `
+              <div class="flock-ai-event flock-event-${e.priority}">
+                <div class="flock-event-header">
+                  <span class="flock-event-type-badge">${e.type}</span>
+                  <span class="flock-event-priority">${e.priority} priority</span>
+                </div>
+                <p class="flock-event-description">${escapeHtml(e.description)}</p>
+                ${e.suggestedMessage ? `<p class="flock-event-suggestion">"${escapeHtml(e.suggestedMessage)}"</p>` : ''}
+              </div>
+            `).join('')}
+            ${d.seasonalOpportunities?.length ? `
+              <div class="flock-seasonal">
+                <strong>Seasonal:</strong> ${d.seasonalOpportunities.join(', ')}
+              </div>
+            ` : ''}
+          </div>
+        `;
+
+        // Update contact with event analysis
+        await updateContact(username, { eventAnalysis: { ...d, analyzedAt: Date.now() } });
+      } else {
+        aiContent.innerHTML = `<p class="flock-ai-empty">No specific opportunities detected. Try adding more details to notes.</p>`;
+      }
+    } else {
+      aiContent.innerHTML = `<p class="flock-ai-error">Failed to analyze: ${escapeHtml(response.error || 'Unknown error')}</p>`;
+    }
+  });
 
   // Event handlers
   document.getElementById('backBtn').addEventListener('click', hideContactDetail);

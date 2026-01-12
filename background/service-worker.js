@@ -647,8 +647,511 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 setupReminderAlarm();
 setupDailyDigest();
 setupAutopilotAlarm();
+setupAIProcessingAlarm();
 
 // Initial check on startup
 setTimeout(checkReminders, 5000);
 
 console.log('[Flock] Service worker initialized');
+
+// ================================
+// AI INTELLIGENCE ENGINE
+// ================================
+
+const AI_PROCESSING_ALARM_NAME = 'flock-ai-processing';
+const AI_PROCESSING_INTERVAL = 60; // Every hour
+
+// --------------------------------
+// 1. SMART AUTO-TAGGING
+// --------------------------------
+
+async function analyzeInteractionForTags(interaction, contact) {
+  const systemPrompt = `You are an AI that analyzes social media interactions to extract meaningful tags and insights. Return ONLY valid JSON.`;
+
+  const userPrompt = `Analyze this interaction and extract relevant tags:
+
+**Interaction Type:** ${interaction.type}
+**Description:** ${interaction.description || 'N/A'}
+**Contact:** @${contact?.username || 'unknown'}
+**Contact Bio:** ${contact?.bio || 'N/A'}
+**Existing Tags:** ${contact?.tags?.join(', ') || 'None'}
+
+Extract:
+{
+  "suggestedTags": ["2-4 relevant tags based on interaction content/context"],
+  "sentiment": "positive/neutral/negative",
+  "intent": "networking/sales/support/casual/collaboration/null",
+  "topics": ["1-3 topics discussed or implied"],
+  "dealSignals": {
+    "interest": "high/medium/low/none",
+    "urgency": "high/medium/low/none",
+    "commitment": "strong/weak/none"
+  },
+  "followUpNeeded": true/false,
+  "confidence": 0.0-1.0
+}
+
+Return ONLY the JSON object.`;
+
+  const result = await callAnthropic(systemPrompt, userPrompt);
+
+  if (result.error) return null;
+
+  try {
+    const jsonMatch = result.content.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]);
+    }
+  } catch (e) {
+    console.error('[Flock] Failed to parse auto-tag response:', e);
+  }
+  return null;
+}
+
+async function processUntaggedInteractions() {
+  console.log('[Flock] Processing interactions for auto-tagging...');
+
+  const interactionsResult = await chrome.storage.local.get('interactions');
+  const interactions = interactionsResult.interactions || {};
+  const contactsResult = await chrome.storage.local.get('contacts');
+  const contacts = contactsResult.contacts || {};
+
+  let processed = 0;
+  const updates = {};
+
+  for (const [id, interaction] of Object.entries(interactions)) {
+    // Skip already analyzed interactions
+    if (interaction.aiAnalysis) continue;
+
+    // Get associated contact
+    const username = interaction.username?.replace('bsky:', '');
+    const contact = contacts[interaction.username] || contacts[username];
+
+    // Analyze interaction
+    const analysis = await analyzeInteractionForTags(interaction, contact);
+
+    if (analysis) {
+      updates[id] = {
+        ...interaction,
+        aiAnalysis: {
+          ...analysis,
+          analyzedAt: Date.now()
+        }
+      };
+
+      // Auto-add high-confidence tags to contact
+      if (analysis.confidence > 0.7 && analysis.suggestedTags?.length > 0 && contact) {
+        const contactKey = interaction.username?.startsWith('bsky:') ? interaction.username : username;
+        const existingTags = new Set(contact.tags || []);
+        analysis.suggestedTags.forEach(tag => {
+          if (!existingTags.has(tag)) {
+            existingTags.add(tag);
+          }
+        });
+        contacts[contactKey] = {
+          ...contact,
+          tags: Array.from(existingTags),
+          updatedAt: Date.now()
+        };
+      }
+
+      processed++;
+
+      // Limit to 10 per run to avoid API rate limits
+      if (processed >= 10) break;
+    }
+  }
+
+  // Save updates
+  if (Object.keys(updates).length > 0) {
+    const allInteractions = { ...interactions, ...updates };
+    await chrome.storage.local.set({ interactions: allInteractions, contacts });
+    console.log(`[Flock] Auto-tagged ${processed} interactions`);
+  }
+}
+
+// --------------------------------
+// 2. NEXT-BEST-ACTION ENGINE
+// --------------------------------
+
+async function generateNextBestAction(contact, interactions) {
+  const systemPrompt = `You are an AI sales coach that analyzes CRM data to recommend the optimal next action. Be specific and actionable. Return ONLY valid JSON.`;
+
+  const recentInteractions = interactions
+    ?.filter(i => i.username === contact.username || i.username === `bsky:${contact.username}`)
+    ?.slice(0, 5)
+    ?.map(i => `- ${i.type}: ${i.description || 'No description'} (${new Date(i.timestamp).toLocaleDateString()})`)
+    ?.join('\n') || 'No recorded interactions';
+
+  const daysSinceContact = contact.lastInteraction
+    ? Math.floor((Date.now() - contact.lastInteraction) / (1000 * 60 * 60 * 24))
+    : null;
+
+  const userPrompt = `Analyze this contact and recommend the optimal next action:
+
+**Contact:** @${contact.username} (${contact.displayName || 'Unknown'})
+**Platform:** ${contact.platform || 'twitter'}
+**Bio:** ${contact.bio || 'No bio'}
+**Pipeline Stage:** ${contact.pipelineStage || 'new'}
+**Tags:** ${contact.tags?.join(', ') || 'None'}
+**Days since last contact:** ${daysSinceContact ?? 'Never contacted'}
+**Followers:** ${contact.followersCount || 'Unknown'}
+**Notes:** ${contact.notes || 'None'}
+
+**Recent Interactions:**
+${recentInteractions}
+
+**Enriched Data:**
+- Company: ${contact.enrichedData?.company || 'Unknown'}
+- Role: ${contact.enrichedData?.role || 'Unknown'}
+- Interests: ${contact.enrichedData?.interests?.join(', ') || 'Unknown'}
+
+Recommend the next best action:
+{
+  "action": "Specific action to take (e.g., 'Send a DM asking about their recent product launch')",
+  "channel": "dm/reply/quote/like/email",
+  "urgency": "high/medium/low",
+  "timing": "now/today/this_week/next_week",
+  "talkingPoints": ["2-3 specific talking points based on their profile/history"],
+  "messageTemplate": "A draft message or conversation starter",
+  "riskIfDelayed": "What might happen if you wait too long",
+  "confidence": 0.0-1.0,
+  "reasoning": "Brief explanation of why this action"
+}
+
+Return ONLY the JSON.`;
+
+  const result = await callAnthropic(systemPrompt, userPrompt);
+
+  if (result.error) return { error: result.error };
+
+  try {
+    const jsonMatch = result.content.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]);
+    }
+  } catch (e) {
+    return { error: 'Failed to parse response' };
+  }
+  return { error: 'Invalid response format' };
+}
+
+// --------------------------------
+// 3. CONVERSATION INTELLIGENCE & OUTCOME PREDICTION
+// --------------------------------
+
+async function analyzeConversationHealth(contact, interactions) {
+  const systemPrompt = `You are an AI that analyzes relationship health and predicts deal outcomes based on interaction patterns. Return ONLY valid JSON.`;
+
+  const contactInteractions = interactions
+    ?.filter(i => i.username === contact.username || i.username === `bsky:${contact.username}`)
+    ?.slice(0, 10);
+
+  const interactionSummary = contactInteractions
+    ?.map(i => {
+      const analysis = i.aiAnalysis || {};
+      return `- ${i.type} (${new Date(i.timestamp).toLocaleDateString()}): ${i.description || 'N/A'} | Sentiment: ${analysis.sentiment || 'unknown'}`;
+    })
+    ?.join('\n') || 'No interactions';
+
+  const userPrompt = `Analyze this relationship and predict outcomes:
+
+**Contact:** @${contact.username}
+**Pipeline Stage:** ${contact.pipelineStage || 'new'}
+**Tags:** ${contact.tags?.join(', ') || 'None'}
+**Notes:** ${contact.notes || 'None'}
+**Days in current stage:** ${contact.stageChangedAt ? Math.floor((Date.now() - contact.stageChangedAt) / (1000 * 60 * 60 * 24)) : 'Unknown'}
+
+**Interaction History:**
+${interactionSummary}
+
+Analyze and predict:
+{
+  "healthScore": 0-100,
+  "healthTrend": "improving/stable/declining",
+  "stageProgression": {
+    "currentStage": "${contact.pipelineStage || 'new'}",
+    "predictedNextStage": "contacted/engaged/qualified/won/lost",
+    "probability": 0.0-1.0,
+    "estimatedDays": 1-90
+  },
+  "riskFactors": ["List any red flags or concerns"],
+  "positiveSignals": ["List positive indicators"],
+  "churnRisk": "high/medium/low",
+  "recommendedFocus": "What to focus on to move this forward",
+  "dealProbability": 0.0-1.0,
+  "confidence": 0.0-1.0
+}
+
+Return ONLY the JSON.`;
+
+  const result = await callAnthropic(systemPrompt, userPrompt);
+
+  if (result.error) return { error: result.error };
+
+  try {
+    const jsonMatch = result.content.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]);
+    }
+  } catch (e) {
+    return { error: 'Failed to parse response' };
+  }
+  return { error: 'Invalid response format' };
+}
+
+// --------------------------------
+// 4. CONTENT RECOMMENDATION ENGINE
+// --------------------------------
+
+async function findContactsForContent(contentUrl, contentTitle, contentSummary) {
+  const contactsResult = await chrome.storage.local.get('contacts');
+  const contacts = Object.values(contactsResult.contacts || {});
+
+  if (contacts.length === 0) return [];
+
+  const systemPrompt = `You are an AI that matches content to people who would be most interested. Return ONLY valid JSON.`;
+
+  // Create a summary of all contacts
+  const contactsSummary = contacts.slice(0, 50).map(c => ({
+    username: c.username,
+    bio: c.bio?.substring(0, 100) || '',
+    tags: c.tags?.slice(0, 5) || [],
+    interests: c.enrichedData?.interests?.slice(0, 3) || [],
+    industry: c.enrichedData?.industry || '',
+    role: c.enrichedData?.role || ''
+  }));
+
+  const userPrompt = `Match this content to the most relevant contacts:
+
+**Content URL:** ${contentUrl}
+**Title:** ${contentTitle}
+**Summary:** ${contentSummary}
+
+**Available Contacts:**
+${JSON.stringify(contactsSummary, null, 2)}
+
+Identify the top 5 contacts who would be most interested in this content:
+{
+  "matches": [
+    {
+      "username": "username",
+      "relevanceScore": 0.0-1.0,
+      "reason": "Why this person would be interested",
+      "suggestedMessage": "A personalized message to share this content"
+    }
+  ],
+  "contentTopics": ["Main topics of the content"],
+  "targetAudience": "Who this content is best suited for"
+}
+
+Return ONLY the JSON.`;
+
+  const result = await callAnthropic(systemPrompt, userPrompt);
+
+  if (result.error) return { error: result.error };
+
+  try {
+    const jsonMatch = result.content.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]);
+    }
+  } catch (e) {
+    return { error: 'Failed to parse response' };
+  }
+  return { error: 'Invalid response format' };
+}
+
+// --------------------------------
+// 5. EVENT-BASED OUTREACH INTELLIGENCE
+// --------------------------------
+
+async function detectEventsAndMilestones(contact) {
+  const systemPrompt = `You are an AI that detects upcoming events, milestones, and timely outreach opportunities from profile information. Return ONLY valid JSON.`;
+
+  const userPrompt = `Analyze this contact for event-based outreach opportunities:
+
+**Contact:** @${contact.username} (${contact.displayName || 'Unknown'})
+**Bio:** ${contact.bio || 'No bio'}
+**Notes:** ${contact.notes || 'None'}
+**Tags:** ${contact.tags?.join(', ') || 'None'}
+**Company:** ${contact.enrichedData?.company || 'Unknown'}
+**Role:** ${contact.enrichedData?.role || 'Unknown'}
+**Saved Date:** ${contact.createdAt ? new Date(contact.createdAt).toLocaleDateString() : 'Unknown'}
+
+Look for:
+- Company anniversaries (e.g., "Founded 2020")
+- Role start dates (e.g., "Started as VP in March")
+- Upcoming events (e.g., "Speaking at TechCrunch Disrupt")
+- Product launches (e.g., "Launching v2 next month")
+- Funding news (e.g., "Just raised Series A")
+- Certifications/awards (e.g., "Recently became AWS certified")
+- Personal milestones (e.g., "1 year on Twitter")
+
+{
+  "detectedEvents": [
+    {
+      "type": "anniversary/launch/event/funding/achievement/milestone",
+      "description": "What the event is",
+      "approximateDate": "YYYY-MM-DD or null if unknown",
+      "outreachWindow": "before/during/after",
+      "suggestedMessage": "A personalized congratulations or outreach message",
+      "priority": "high/medium/low"
+    }
+  ],
+  "seasonalOpportunities": ["Any seasonal/holiday outreach opportunities"],
+  "hasTimeSensitiveOpportunity": true/false,
+  "confidence": 0.0-1.0
+}
+
+Return ONLY the JSON.`;
+
+  const result = await callAnthropic(systemPrompt, userPrompt);
+
+  if (result.error) return { error: result.error };
+
+  try {
+    const jsonMatch = result.content.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]);
+    }
+  } catch (e) {
+    return { error: 'Failed to parse response' };
+  }
+  return { error: 'Invalid response format' };
+}
+
+async function processContactsForEvents() {
+  console.log('[Flock] Processing contacts for event detection...');
+
+  const contactsResult = await chrome.storage.local.get('contacts');
+  const contacts = contactsResult.contacts || {};
+
+  let processed = 0;
+
+  for (const [key, contact] of Object.entries(contacts)) {
+    // Skip if analyzed recently (within 7 days)
+    if (contact.eventAnalysis?.analyzedAt &&
+        (Date.now() - contact.eventAnalysis.analyzedAt) < (7 * 24 * 60 * 60 * 1000)) {
+      continue;
+    }
+
+    const events = await detectEventsAndMilestones(contact);
+
+    if (!events.error) {
+      contacts[key] = {
+        ...contact,
+        eventAnalysis: {
+          ...events,
+          analyzedAt: Date.now()
+        },
+        updatedAt: Date.now()
+      };
+
+      // Create auto-reminder for high-priority time-sensitive opportunities
+      if (events.hasTimeSensitiveOpportunity && !contact.reminder) {
+        const highPriorityEvent = events.detectedEvents?.find(e => e.priority === 'high');
+        if (highPriorityEvent) {
+          const reminderDate = new Date();
+          reminderDate.setDate(reminderDate.getDate() + 1);
+          reminderDate.setHours(10, 0, 0, 0);
+
+          contacts[key].reminder = {
+            date: reminderDate.getTime(),
+            note: `Event opportunity: ${highPriorityEvent.description}`
+          };
+        }
+      }
+
+      processed++;
+
+      // Limit to 5 per run to avoid API rate limits
+      if (processed >= 5) break;
+    }
+  }
+
+  if (processed > 0) {
+    await chrome.storage.local.set({ contacts });
+    console.log(`[Flock] Analyzed ${processed} contacts for events`);
+  }
+}
+
+// --------------------------------
+// AI PROCESSING SCHEDULER
+// --------------------------------
+
+async function runAIProcessing() {
+  const apiKey = await getApiKey();
+  if (!apiKey) {
+    console.log('[Flock] AI processing skipped - no API key');
+    return;
+  }
+
+  console.log('[Flock] Running AI processing batch...');
+
+  try {
+    // Run auto-tagging
+    await processUntaggedInteractions();
+
+    // Run event detection
+    await processContactsForEvents();
+
+    console.log('[Flock] AI processing batch complete');
+  } catch (error) {
+    console.error('[Flock] AI processing error:', error);
+  }
+}
+
+async function setupAIProcessingAlarm() {
+  await chrome.alarms.clear(AI_PROCESSING_ALARM_NAME);
+
+  chrome.alarms.create(AI_PROCESSING_ALARM_NAME, {
+    delayInMinutes: 5, // First run in 5 minutes
+    periodInMinutes: AI_PROCESSING_INTERVAL
+  });
+
+  console.log('[Flock] AI processing alarm scheduled');
+}
+
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === AI_PROCESSING_ALARM_NAME) {
+    runAIProcessing();
+  }
+});
+
+// --------------------------------
+// MESSAGE HANDLERS FOR AI FEATURES
+// --------------------------------
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  switch (message.action) {
+    case 'getNextBestAction':
+      generateNextBestAction(message.contact, message.interactions)
+        .then(data => sendResponse({ success: !data.error, data, error: data.error }));
+      return true;
+
+    case 'getConversationHealth':
+      analyzeConversationHealth(message.contact, message.interactions)
+        .then(data => sendResponse({ success: !data.error, data, error: data.error }));
+      return true;
+
+    case 'getContentRecommendations':
+      findContactsForContent(message.url, message.title, message.summary)
+        .then(data => sendResponse({ success: !data.error, data, error: data.error }));
+      return true;
+
+    case 'getEventOpportunities':
+      detectEventsAndMilestones(message.contact)
+        .then(data => sendResponse({ success: !data.error, data, error: data.error }));
+      return true;
+
+    case 'analyzeInteraction':
+      analyzeInteractionForTags(message.interaction, message.contact)
+        .then(data => sendResponse({ success: !!data, data }));
+      return true;
+
+    case 'runAIProcessingNow':
+      runAIProcessing().then(() => sendResponse({ success: true }));
+      return true;
+  }
+});
