@@ -2,155 +2,57 @@
  * Flock Options Page Script
  */
 
-const DB_NAME = 'flock-crm';
-const DB_VERSION = 1;
-
-let db = null;
-
 // ================================
-// DATABASE
+// STORAGE (using chrome.storage.local for cross-context sharing)
 // ================================
-
-async function initDB() {
-  if (db) return db;
-
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => {
-      db = request.result;
-      resolve(db);
-    };
-    request.onupgradeneeded = (event) => {
-      const database = event.target.result;
-
-      if (!database.objectStoreNames.contains('contacts')) {
-        const contactsStore = database.createObjectStore('contacts', { keyPath: 'username' });
-        contactsStore.createIndex('list', 'list', { unique: false });
-        contactsStore.createIndex('pipelineStage', 'pipelineStage', { unique: false });
-        contactsStore.createIndex('createdAt', 'createdAt', { unique: false });
-      }
-
-      if (!database.objectStoreNames.contains('lists')) {
-        database.createObjectStore('lists', { keyPath: 'id' });
-      }
-
-      if (!database.objectStoreNames.contains('tags')) {
-        database.createObjectStore('tags', { keyPath: 'id' });
-      }
-
-      if (!database.objectStoreNames.contains('interactions')) {
-        const interactionsStore = database.createObjectStore('interactions', { keyPath: 'id' });
-        interactionsStore.createIndex('contactUsername', 'contactUsername', { unique: false });
-      }
-
-      if (!database.objectStoreNames.contains('settings')) {
-        database.createObjectStore('settings', { keyPath: 'key' });
-      }
-    };
-  });
-}
 
 async function getAllContacts() {
-  await initDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction('contacts', 'readonly');
-    const store = tx.objectStore('contacts');
-    const request = store.getAll();
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
+  const result = await chrome.storage.local.get('contacts');
+  const contactsObj = result.contacts || {};
+  return Object.values(contactsObj);
 }
 
 async function getAllInteractions() {
-  await initDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction('interactions', 'readonly');
-    const store = tx.objectStore('interactions');
-    const request = store.getAll();
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
+  const result = await chrome.storage.local.get('interactions');
+  const interactionsObj = result.interactions || {};
+  return Object.values(interactionsObj);
 }
 
 async function getAllLists() {
-  await initDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction('lists', 'readonly');
-    const store = tx.objectStore('lists');
-    const request = store.getAll();
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
+  const result = await chrome.storage.local.get('lists');
+  return result.lists || [];
 }
 
 async function getAllTags() {
-  await initDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction('tags', 'readonly');
-    const store = tx.objectStore('tags');
-    const request = store.getAll();
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
+  const result = await chrome.storage.local.get('tags');
+  return result.tags || [];
 }
 
 async function clearAllData() {
-  await initDB();
-
-  const stores = ['contacts', 'lists', 'tags', 'interactions', 'settings'];
-
-  for (const storeName of stores) {
-    await new Promise((resolve, reject) => {
-      const tx = db.transaction(storeName, 'readwrite');
-      const store = tx.objectStore(storeName);
-      const request = store.clear();
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
-    });
-  }
+  await chrome.storage.local.clear();
 }
 
 async function importData(data) {
   if (data.version !== 1) throw new Error('Unsupported export version');
 
-  await initDB();
-
+  // Convert contacts array to object keyed by username
+  const contactsObj = {};
   for (const contact of data.contacts || []) {
-    await new Promise((resolve, reject) => {
-      const tx = db.transaction('contacts', 'readwrite');
-      tx.objectStore('contacts').put(contact);
-      tx.oncomplete = resolve;
-      tx.onerror = () => reject(tx.error);
-    });
+    contactsObj[contact.username] = contact;
   }
 
-  for (const list of data.lists || []) {
-    await new Promise((resolve, reject) => {
-      const tx = db.transaction('lists', 'readwrite');
-      tx.objectStore('lists').put(list);
-      tx.oncomplete = resolve;
-      tx.onerror = () => reject(tx.error);
-    });
-  }
-
-  for (const tag of data.tags || []) {
-    await new Promise((resolve, reject) => {
-      const tx = db.transaction('tags', 'readwrite');
-      tx.objectStore('tags').put(tag);
-      tx.oncomplete = resolve;
-      tx.onerror = () => reject(tx.error);
-    });
-  }
-
+  // Convert interactions array to object keyed by id
+  const interactionsObj = {};
   for (const interaction of data.interactions || []) {
-    await new Promise((resolve, reject) => {
-      const tx = db.transaction('interactions', 'readwrite');
-      tx.objectStore('interactions').put(interaction);
-      tx.oncomplete = resolve;
-      tx.onerror = () => reject(tx.error);
-    });
+    interactionsObj[interaction.id] = interaction;
   }
+
+  await chrome.storage.local.set({
+    contacts: contactsObj,
+    interactions: interactionsObj,
+    lists: data.lists || [],
+    tags: data.tags || [],
+  });
 }
 
 // ================================
@@ -339,7 +241,6 @@ async function saveApiKey() {
 
 async function init() {
   try {
-    await initDB();
     await updateStats();
     await loadApiKey();
 

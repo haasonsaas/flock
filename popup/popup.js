@@ -4,63 +4,18 @@
  */
 
 // ================================
-// STORAGE
+// STORAGE (using chrome.storage.local for cross-context sharing)
 // ================================
-const DB_NAME = 'flock-crm';
-const DB_VERSION = 1;
-
-let db = null;
-
-async function initDB() {
-  if (db) return db;
-
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => {
-      db = request.result;
-      resolve(db);
-    };
-    request.onupgradeneeded = (event) => {
-      const database = event.target.result;
-
-      if (!database.objectStoreNames.contains('contacts')) {
-        const contactsStore = database.createObjectStore('contacts', { keyPath: 'username' });
-        contactsStore.createIndex('list', 'list', { unique: false });
-        contactsStore.createIndex('pipelineStage', 'pipelineStage', { unique: false });
-        contactsStore.createIndex('createdAt', 'createdAt', { unique: false });
-        contactsStore.createIndex('lastInteraction', 'lastInteraction', { unique: false });
-      }
-
-      if (!database.objectStoreNames.contains('lists')) {
-        database.createObjectStore('lists', { keyPath: 'id' });
-      }
-
-      if (!database.objectStoreNames.contains('tags')) {
-        database.createObjectStore('tags', { keyPath: 'id' });
-      }
-
-      if (!database.objectStoreNames.contains('interactions')) {
-        const interactionsStore = database.createObjectStore('interactions', { keyPath: 'id' });
-        interactionsStore.createIndex('contactUsername', 'contactUsername', { unique: false });
-      }
-
-      if (!database.objectStoreNames.contains('settings')) {
-        database.createObjectStore('settings', { keyPath: 'key' });
-      }
-    };
-  });
-}
 
 async function getAllContacts() {
-  await initDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction('contacts', 'readonly');
-    const store = tx.objectStore('contacts');
-    const request = store.getAll();
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
+  const result = await chrome.storage.local.get('contacts');
+  const contactsObj = result.contacts || {};
+  return Object.values(contactsObj);
+}
+
+async function getAllInteractions() {
+  const result = await chrome.storage.local.get('interactions');
+  return result.interactions || {};
 }
 
 async function searchContacts(query) {
@@ -77,11 +32,13 @@ async function searchContacts(query) {
 
 async function exportData() {
   const contacts = await getAllContacts();
+  const interactions = await getAllInteractions();
 
   return {
     version: 1,
     exportedAt: Date.now(),
     contacts,
+    interactions: Object.values(interactions),
   };
 }
 
@@ -347,8 +304,6 @@ async function handleExport() {
 
 async function init() {
   try {
-    await initDB();
-
     // Load contacts
     allContacts = await getAllContacts();
 

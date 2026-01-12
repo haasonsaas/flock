@@ -81,60 +81,20 @@ const FlockAgent = {
 };
 
 // ================================
-// STORAGE (simplified for content script)
+// STORAGE (using chrome.storage.local for cross-context sharing)
 // ================================
-const DB_NAME = 'flock-crm';
-const DB_VERSION = 1;
 
-let db = null;
+async function getAllContacts() {
+  const result = await chrome.storage.local.get('contacts');
+  return result.contacts || {};
+}
 
-async function initDB() {
-  if (db) return db;
-
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => {
-      db = request.result;
-      resolve(db);
-    };
-    request.onupgradeneeded = (event) => {
-      const database = event.target.result;
-
-      if (!database.objectStoreNames.contains('contacts')) {
-        const contactsStore = database.createObjectStore('contacts', { keyPath: 'username' });
-        contactsStore.createIndex('list', 'list', { unique: false });
-        contactsStore.createIndex('pipelineStage', 'pipelineStage', { unique: false });
-        contactsStore.createIndex('createdAt', 'createdAt', { unique: false });
-        contactsStore.createIndex('lastInteraction', 'lastInteraction', { unique: false });
-      }
-
-      if (!database.objectStoreNames.contains('lists')) {
-        const listsStore = database.createObjectStore('lists', { keyPath: 'id' });
-        listsStore.createIndex('name', 'name', { unique: true });
-      }
-
-      if (!database.objectStoreNames.contains('tags')) {
-        const tagsStore = database.createObjectStore('tags', { keyPath: 'id' });
-        tagsStore.createIndex('name', 'name', { unique: true });
-      }
-
-      if (!database.objectStoreNames.contains('interactions')) {
-        const interactionsStore = database.createObjectStore('interactions', { keyPath: 'id' });
-        interactionsStore.createIndex('contactUsername', 'contactUsername', { unique: false });
-        interactionsStore.createIndex('timestamp', 'timestamp', { unique: false });
-        interactionsStore.createIndex('type', 'type', { unique: false });
-      }
-
-      if (!database.objectStoreNames.contains('settings')) {
-        database.createObjectStore('settings', { keyPath: 'key' });
-      }
-    };
-  });
+async function saveAllContacts(contacts) {
+  await chrome.storage.local.set({ contacts });
 }
 
 async function saveContact(contact) {
-  await initDB();
+  const contacts = await getAllContacts();
   const enrichedContact = {
     ...contact,
     createdAt: contact.createdAt || Date.now(),
@@ -147,24 +107,14 @@ async function saveContact(contact) {
     nextFollowUp: contact.nextFollowUp || null,
   };
 
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction('contacts', 'readwrite');
-    const store = tx.objectStore('contacts');
-    const request = store.put(enrichedContact);
-    request.onsuccess = () => resolve(enrichedContact);
-    request.onerror = () => reject(request.error);
-  });
+  contacts[contact.username] = enrichedContact;
+  await saveAllContacts(contacts);
+  return enrichedContact;
 }
 
 async function getContact(username) {
-  await initDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction('contacts', 'readonly');
-    const store = tx.objectStore('contacts');
-    const request = store.get(username);
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
+  const contacts = await getAllContacts();
+  return contacts[username] || null;
 }
 
 async function updateContact(username, updates) {
@@ -173,23 +123,31 @@ async function updateContact(username, updates) {
   return saveContact({ ...existing, ...updates });
 }
 
+async function deleteContact(username) {
+  const contacts = await getAllContacts();
+  delete contacts[username];
+  await saveAllContacts(contacts);
+}
+
+async function getAllInteractions() {
+  const result = await chrome.storage.local.get('interactions');
+  return result.interactions || {};
+}
+
+async function saveAllInteractions(interactions) {
+  await chrome.storage.local.set({ interactions });
+}
+
 async function getInteractionsForContact(username) {
-  await initDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction('interactions', 'readonly');
-    const store = tx.objectStore('interactions');
-    const index = store.index('contactUsername');
-    const request = index.getAll(username);
-    request.onsuccess = () => {
-      const results = request.result.sort((a, b) => b.timestamp - a.timestamp);
-      resolve(results);
-    };
-    request.onerror = () => reject(request.error);
-  });
+  const interactions = await getAllInteractions();
+  const contactInteractions = Object.values(interactions)
+    .filter(i => i.contactUsername === username)
+    .sort((a, b) => b.timestamp - a.timestamp);
+  return contactInteractions;
 }
 
 async function logInteraction(contactUsername, type, content = '', metadata = {}) {
-  await initDB();
+  const interactions = await getAllInteractions();
   const interaction = {
     id: `int_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
     contactUsername,
@@ -199,19 +157,16 @@ async function logInteraction(contactUsername, type, content = '', metadata = {}
     timestamp: Date.now(),
   };
 
+  interactions[interaction.id] = interaction;
+  await saveAllInteractions(interactions);
+
   try {
     await updateContact(contactUsername, { lastInteraction: Date.now() });
   } catch (e) {
     // Contact might not exist yet
   }
 
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction('interactions', 'readwrite');
-    const store = tx.objectStore('interactions');
-    const request = store.put(interaction);
-    request.onsuccess = () => resolve(interaction);
-    request.onerror = () => reject(request.error);
-  });
+  return interaction;
 }
 
 // ================================
@@ -1183,9 +1138,6 @@ async function init() {
   console.log('[Flock] Initializing...');
 
   try {
-    await initDB();
-    console.log('[Flock] Database initialized');
-
     // Initial injection
     injectSaveButton();
 
