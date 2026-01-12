@@ -1,6 +1,6 @@
 /**
  * Flock Popup Styles
- * Premium utility aesthetic with Twitter integration
+ * Mission Control Terminal Aesthetic
  */
 
 /* ================================
@@ -15,37 +15,40 @@
 :root {
   --flock-amber: #F59E0B;
   --flock-amber-hover: #D97706;
-  --flock-amber-light: rgba(245, 158, 11, 0.15);
-  --flock-amber-glow: rgba(245, 158, 11, 0.3);
+  --flock-amber-light: rgba(245, 158, 11, 0.12);
+  --flock-amber-glow: rgba(245, 158, 11, 0.4);
 
   --flock-success: #10B981;
   --flock-warning: #F59E0B;
   --flock-error: #EF4444;
   --flock-info: #3B82F6;
+  --flock-purple: #8B5CF6;
 
   --flock-bg-primary: #000000;
-  --flock-bg-secondary: #16181C;
-  --flock-bg-tertiary: #1D1F23;
-  --flock-bg-elevated: #202327;
-  --flock-bg-hover: #2C2F33;
+  --flock-bg-secondary: #0a0b0d;
+  --flock-bg-tertiary: #111214;
+  --flock-bg-elevated: #18191c;
+  --flock-bg-hover: #1e2023;
 
-  --flock-border: rgba(255, 255, 255, 0.1);
-  --flock-border-subtle: rgba(255, 255, 255, 0.05);
+  --flock-border: rgba(245, 158, 11, 0.15);
+  --flock-border-subtle: rgba(255, 255, 255, 0.06);
+  --flock-border-glow: rgba(245, 158, 11, 0.3);
 
   --flock-text-primary: #E7E9EA;
-  --flock-text-secondary: #71767B;
-  --flock-text-tertiary: #536471;
+  --flock-text-secondary: #8B8F94;
+  --flock-text-tertiary: #5C6066;
 
   --flock-font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --flock-font-mono: "SF Mono", "Roboto Mono", "IBM Plex Mono", Menlo, monospace;
+  --flock-font-mono: "SF Mono", "JetBrains Mono", "Roboto Mono", Menlo, monospace;
 
   --flock-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
   --flock-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
   --flock-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.6);
+  --flock-shadow-glow: 0 0 20px rgba(245, 158, 11, 0.15);
 
-  --flock-radius-sm: 4px;
-  --flock-radius-md: 8px;
-  --flock-radius-lg: 12px;
+  --flock-radius-sm: 3px;
+  --flock-radius-md: 6px;
+  --flock-radius-lg: 8px;
   --flock-radius-full: 9999px;
 
   --flock-transition: 150ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -57,10 +60,26 @@ body {
   max-height: 600px;
   background: var(--flock-bg-primary);
   color: var(--flock-text-primary);
-  font-family: var(--flock-font-sans);
-  font-size: 14px;
+  font-family: var(--flock-font-mono);
+  font-size: 12px;
   line-height: 1.4;
   overflow: hidden;
+}
+
+/* Global scanlines */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.03) 2px,
+    rgba(0, 0, 0, 0.03) 4px
+  );
+  z-index: 9999;
 }
 
 /* ================================
@@ -71,18 +90,32 @@ body {
   flex-direction: column;
   height: 100vh;
   max-height: 600px;
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(245, 158, 11, 0.03) 0%, transparent 50%),
+    var(--flock-bg-primary);
 }
 
 /* ================================
-   HEADER
+   HEADER - Mission Control
    ================================ */
 .flock-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 12px;
-  background: linear-gradient(180deg, var(--flock-bg-secondary) 0%, var(--flock-bg-primary) 100%);
+  padding: 8px 12px;
+  background: var(--flock-bg-secondary);
   border-bottom: 1px solid var(--flock-border);
+  position: relative;
+}
+
+.flock-header::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--flock-amber-glow), transparent);
 }
 
 .flock-logo {
@@ -92,17 +125,26 @@ body {
 }
 
 .flock-logo-icon {
-  width: 26px;
-  height: 26px;
+  width: 22px;
+  height: 22px;
   fill: var(--flock-amber);
   filter: drop-shadow(0 0 8px var(--flock-amber-glow));
+  animation: mc-logo-pulse 3s ease-in-out infinite;
+}
+
+@keyframes mc-logo-pulse {
+  0%, 100% { filter: drop-shadow(0 0 8px var(--flock-amber-glow)); }
+  50% { filter: drop-shadow(0 0 12px var(--flock-amber-glow)); }
 }
 
 .flock-logo-text {
-  font-size: 17px;
+  font-family: var(--flock-font-mono);
+  font-size: 14px;
   font-weight: 700;
-  color: var(--flock-text-primary);
-  letter-spacing: -0.02em;
+  color: var(--flock-amber);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  text-shadow: 0 0 10px var(--flock-amber-glow);
 }
 
 .flock-header-actions {
@@ -114,24 +156,25 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
-  border: none;
+  width: 30px;
+  height: 30px;
+  border: 1px solid transparent;
   background: transparent;
-  border-radius: var(--flock-radius-full);
-  color: var(--flock-text-secondary);
+  border-radius: var(--flock-radius-sm);
+  color: var(--flock-text-tertiary);
   cursor: pointer;
   transition: all var(--flock-transition);
 }
 
 .flock-icon-btn:hover {
   background: var(--flock-bg-tertiary);
-  color: var(--flock-text-primary);
+  border-color: var(--flock-border);
+  color: var(--flock-amber);
 }
 
 .flock-icon-btn svg {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
 }
 
 /* ================================
@@ -162,43 +205,45 @@ body {
   padding: 8px 12px;
   background: var(--flock-bg-secondary);
   border: 1px solid var(--flock-border);
-  border-radius: var(--flock-radius-full);
+  border-radius: 2px;
   color: var(--flock-text-primary);
-  font-family: var(--flock-font-sans);
-  font-size: 12px;
+  font-family: var(--flock-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.5px;
   transition: all var(--flock-transition);
 }
 
 .flock-search-input:focus {
   outline: none;
   border-color: var(--flock-amber);
-  box-shadow: 0 0 0 3px var(--flock-amber-light);
+  box-shadow: 0 0 0 2px var(--flock-amber-light), 0 0 12px var(--flock-amber-glow);
 }
 
 .flock-search-save {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   flex-shrink: 0;
   background: transparent;
   border: 1px solid var(--flock-border);
-  border-radius: var(--flock-radius-full);
+  border-radius: 2px;
   color: var(--flock-text-tertiary);
   cursor: pointer;
   transition: all var(--flock-transition);
 }
 
 .flock-search-save:hover {
-  background: var(--flock-bg-hover);
+  background: var(--flock-amber-light);
   color: var(--flock-amber);
   border-color: var(--flock-amber);
+  box-shadow: 0 0 8px var(--flock-amber-glow);
 }
 
 .flock-search-save svg {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
 }
 
 .flock-search-hints {
@@ -290,69 +335,107 @@ body {
 }
 
 /* ================================
-   STATS
+   STATS - Mission Control Readouts
    ================================ */
 .flock-stats {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
-  padding: 10px 12px;
+  gap: 8px;
+  padding: 12px;
   background: var(--flock-bg-primary);
 }
 
 .flock-stat-card {
+  position: relative;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  padding: 10px 6px;
-  background: var(--flock-bg-secondary);
-  border-radius: var(--flock-radius-md);
-  border: 1px solid var(--flock-border-subtle);
+  align-items: flex-start;
+  padding: 10px 12px;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.04) 0%, transparent 60%);
+  border-radius: 2px;
+  border: 1px solid var(--flock-border);
   transition: all var(--flock-transition);
+  overflow: hidden;
+}
+
+/* Corner accent */
+.flock-stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 3px;
+  height: 100%;
+  background: var(--flock-amber);
+  opacity: 0.5;
+  transition: opacity var(--flock-transition);
+}
+
+.flock-stat-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 12px;
+  height: 1px;
+  background: var(--flock-amber);
 }
 
 .flock-stat-card[data-filter="followup"] {
   cursor: pointer;
 }
 
-.flock-stat-card[data-filter="followup"]:hover {
-  background: var(--flock-bg-tertiary);
-  border-color: var(--flock-border);
+.flock-stat-card[data-filter="followup"]:hover,
+.flock-stat-card:hover {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, transparent 60%);
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.flock-stat-card:hover::before {
+  opacity: 1;
 }
 
 .flock-stat-card.flock-stat-active {
-  background: var(--flock-amber-light);
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.12) 0%, transparent 60%);
   border-color: var(--flock-amber);
+}
+
+.flock-stat-card.flock-stat-active::before {
+  opacity: 1;
+  box-shadow: 0 0 8px var(--flock-amber-glow);
+}
+
+.flock-stat-label {
+  font-family: var(--flock-font-mono);
+  font-size: 9px;
+  font-weight: 500;
+  color: var(--flock-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 4px;
 }
 
 .flock-stat-value {
   font-family: var(--flock-font-mono);
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 700;
   color: var(--flock-amber);
   line-height: 1;
-}
-
-.flock-stat-label {
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--flock-text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-top: 4px;
+  text-shadow: 0 0 12px var(--flock-amber-glow);
 }
 
 /* ================================
-   TABS
+   TABS - Terminal Navigation
    ================================ */
 .flock-tabs {
   display: flex;
-  gap: 2px;
-  padding: 0 12px 6px;
+  gap: 0;
+  padding: 0 12px 8px;
   background: var(--flock-bg-primary);
   overflow-x: auto;
   scrollbar-width: none;
   -ms-overflow-style: none;
+  border-bottom: 1px solid var(--flock-border);
 }
 
 .flock-tabs::-webkit-scrollbar {
@@ -360,63 +443,126 @@ body {
 }
 
 .flock-tab {
+  position: relative;
   flex-shrink: 0;
-  padding: 5px 8px;
+  padding: 6px 12px;
   border: none;
   background: transparent;
-  border-radius: var(--flock-radius-full);
-  color: var(--flock-text-secondary);
-  font-family: var(--flock-font-sans);
+  border-radius: 0;
+  color: var(--flock-text-tertiary);
+  font-family: var(--flock-font-mono);
   font-size: 10px;
-  font-weight: 600;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
   cursor: pointer;
   transition: all var(--flock-transition);
   white-space: nowrap;
 }
 
+/* Bracket prefix for tabs */
+.flock-tab::before {
+  content: '[';
+  margin-right: 2px;
+  opacity: 0;
+  transition: opacity var(--flock-transition);
+}
+
+.flock-tab::after {
+  content: ']';
+  margin-left: 2px;
+  opacity: 0;
+  transition: opacity var(--flock-transition);
+}
+
 .flock-tab:hover {
-  background: var(--flock-bg-tertiary);
   color: var(--flock-text-primary);
 }
 
+.flock-tab:hover::before,
+.flock-tab:hover::after {
+  opacity: 0.5;
+}
+
 .flock-tab.flock-active {
+  color: var(--flock-amber);
+  text-shadow: 0 0 8px var(--flock-amber-glow);
+}
+
+.flock-tab.flock-active::before,
+.flock-tab.flock-active::after {
+  opacity: 1;
+  color: var(--flock-amber);
+}
+
+/* Active indicator line */
+.flock-tab.flock-active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  margin: 0;
   background: var(--flock-amber);
-  color: #000;
+  box-shadow: 0 0 8px var(--flock-amber-glow);
 }
 
 /* ================================
-   FILTER BAR
+   FILTER BAR - Command Line Style
    ================================ */
 .flock-filter-bar {
   display: flex;
-  gap: 4px;
-  padding: 0 12px 8px;
+  gap: 6px;
+  padding: 0 12px 10px;
   background: var(--flock-bg-primary);
   position: relative;
   z-index: 100;
 }
 
+/* Command prompt prefix */
+.flock-filter-bar::before {
+  content: '>';
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--flock-amber);
+  font-family: var(--flock-font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  opacity: 0.6;
+  pointer-events: none;
+}
+
 .flock-filter-select {
   flex: 1;
   min-width: 0;
-  padding: 5px 6px;
+  padding: 6px 8px 6px 20px;
   background: var(--flock-bg-secondary);
-  border: 1px solid var(--flock-border-subtle);
-  border-radius: var(--flock-radius-sm);
+  border: 1px solid var(--flock-border);
+  border-radius: 2px;
   color: var(--flock-text-primary);
-  font-family: var(--flock-font-sans);
-  font-size: 11px;
+  font-family: var(--flock-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.5px;
   cursor: pointer;
   transition: all var(--flock-transition);
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23F59E0B' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
 }
 
 .flock-filter-select:focus {
   outline: none;
   border-color: var(--flock-amber);
+  box-shadow: 0 0 0 2px var(--flock-amber-light);
 }
 
 .flock-filter-select option {
   background: var(--flock-bg-secondary);
+  font-family: var(--flock-font-mono);
 }
 
 /* ================================
@@ -430,67 +576,90 @@ body {
   z-index: 1;
 }
 
-/* Scrollbar */
+/* Terminal-style Scrollbar */
 .flock-content::-webkit-scrollbar {
-  width: 5px;
+  width: 4px;
 }
 
 .flock-content::-webkit-scrollbar-track {
-  background: transparent;
+  background: var(--flock-bg-secondary);
 }
 
 .flock-content::-webkit-scrollbar-thumb {
-  background: var(--flock-bg-tertiary);
-  border-radius: 3px;
+  background: var(--flock-amber);
+  opacity: 0.5;
 }
 
 .flock-content::-webkit-scrollbar-thumb:hover {
-  background: var(--flock-bg-elevated);
+  background: var(--flock-amber);
 }
 
 /* ================================
-   CONTACT LIST
+   CONTACT LIST - Data Entries
    ================================ */
 .flock-contact-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .flock-contact-card {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 10px 12px;
   background: var(--flock-bg-secondary);
-  border-radius: var(--flock-radius-lg);
-  border: 1px solid var(--flock-border-subtle);
+  border-radius: 2px;
+  border: 1px solid var(--flock-border);
+  border-left: 3px solid transparent;
   cursor: pointer;
   transition: all var(--flock-transition);
 }
 
 .flock-contact-card:hover {
-  background: var(--flock-bg-tertiary);
+  background: linear-gradient(90deg, rgba(245, 158, 11, 0.06) 0%, transparent 50%);
   border-color: var(--flock-border);
-  transform: translateX(2px);
+  border-left-color: var(--flock-amber);
+}
+
+.flock-contact-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  background: var(--flock-amber);
+  opacity: 0.1;
+  transition: width var(--flock-transition);
+}
+
+.flock-contact-card:hover::before {
+  width: 100%;
 }
 
 .flock-contact-avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: var(--flock-radius-full);
+  position: relative;
+  width: 36px;
+  height: 36px;
+  border-radius: 2px;
   background: var(--flock-bg-tertiary);
   object-fit: cover;
   flex-shrink: 0;
+  border: 1px solid var(--flock-border);
 }
 
 .flock-contact-info {
   flex: 1;
   min-width: 0;
+  position: relative;
+  z-index: 1;
 }
 
 .flock-contact-name {
-  font-size: 13px;
+  font-family: var(--flock-font-mono);
+  font-size: 12px;
   font-weight: 600;
   color: var(--flock-text-primary);
   white-space: nowrap;
@@ -499,37 +668,57 @@ body {
 }
 
 .flock-contact-username {
-  font-size: 12px;
-  color: var(--flock-text-secondary);
+  font-family: var(--flock-font-mono);
+  font-size: 11px;
+  color: var(--flock-amber);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  opacity: 0.8;
 }
 
 .flock-contact-meta {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-top: 3px;
+  margin-top: 4px;
 }
 
 .flock-contact-stage {
   display: inline-flex;
   padding: 2px 6px;
-  background: var(--flock-bg-tertiary);
-  border-radius: var(--flock-radius-full);
-  font-size: 9px;
+  background: transparent;
+  border: 1px solid currentColor;
+  border-radius: 0;
+  font-family: var(--flock-font-mono);
+  font-size: 8px;
   font-weight: 600;
   color: var(--flock-text-secondary);
   text-transform: uppercase;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.5px;
 }
 
-.flock-contact-stage.stage-new { background: rgba(59, 130, 246, 0.15); color: #3B82F6; }
-.flock-contact-stage.stage-contacted { background: rgba(139, 92, 246, 0.15); color: #8B5CF6; }
-.flock-contact-stage.stage-engaged { background: rgba(245, 158, 11, 0.15); color: #F59E0B; }
-.flock-contact-stage.stage-qualified { background: rgba(16, 185, 129, 0.15); color: #10B981; }
-.flock-contact-stage.stage-won { background: rgba(16, 185, 129, 0.25); color: #10B981; }
+.flock-contact-stage.stage-new {
+  border-color: #3B82F6;
+  color: #3B82F6;
+}
+.flock-contact-stage.stage-contacted {
+  border-color: #8B5CF6;
+  color: #8B5CF6;
+}
+.flock-contact-stage.stage-engaged {
+  border-color: #F59E0B;
+  color: #F59E0B;
+}
+.flock-contact-stage.stage-qualified {
+  border-color: #10B981;
+  color: #10B981;
+}
+.flock-contact-stage.stage-won {
+  border-color: #10B981;
+  color: #10B981;
+  background: rgba(16, 185, 129, 0.15);
+}
 .flock-contact-stage.stage-lost { background: rgba(239, 68, 68, 0.15); color: #EF4444; }
 
 .flock-contact-time {
@@ -693,7 +882,7 @@ body {
 }
 
 /* ================================
-   DETAIL PANEL
+   DETAIL PANEL - Terminal Profile View
    ================================ */
 .flock-detail-panel {
   animation: flock-slide-in 0.2s ease-out;
@@ -709,6 +898,8 @@ body {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--flock-border);
 }
 
 .flock-back-btn {
@@ -716,36 +907,39 @@ body {
   align-items: center;
   gap: 6px;
   padding: 6px 12px;
-  background: var(--flock-bg-secondary);
-  border: 1px solid var(--flock-border-subtle);
-  border-radius: var(--flock-radius-full);
+  background: transparent;
+  border: 1px solid var(--flock-border);
+  border-radius: 2px;
   color: var(--flock-text-primary);
-  font-family: var(--flock-font-sans);
-  font-size: 12px;
+  font-family: var(--flock-font-mono);
+  font-size: 10px;
   font-weight: 500;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
   cursor: pointer;
   transition: all var(--flock-transition);
 }
 
 .flock-back-btn:hover {
-  background: var(--flock-bg-tertiary);
-  border-color: var(--flock-border);
+  background: var(--flock-amber-light);
+  border-color: var(--flock-amber);
+  color: var(--flock-amber);
 }
 
 .flock-back-btn svg {
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
 }
 
 .flock-open-profile {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
-  background: var(--flock-bg-secondary);
-  border: 1px solid var(--flock-border-subtle);
-  border-radius: var(--flock-radius-full);
+  width: 28px;
+  height: 28px;
+  background: transparent;
+  border: 1px solid var(--flock-border);
+  border-radius: 2px;
   color: var(--flock-text-secondary);
   cursor: pointer;
   transition: all var(--flock-transition);
@@ -755,6 +949,7 @@ body {
   background: var(--flock-amber);
   border-color: var(--flock-amber);
   color: #000;
+  box-shadow: 0 0 12px var(--flock-amber-glow);
 }
 
 .flock-open-profile svg {
@@ -765,16 +960,22 @@ body {
 .flock-detail-profile {
   display: flex;
   gap: 14px;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
+  padding: 12px;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.04) 0%, transparent 60%);
+  border: 1px solid var(--flock-border);
+  border-radius: 2px;
 }
 
 .flock-detail-avatar {
-  width: 56px;
-  height: 56px;
-  border-radius: var(--flock-radius-full);
+  width: 52px;
+  height: 52px;
+  border-radius: 2px;
   background: var(--flock-bg-tertiary);
   object-fit: cover;
   flex-shrink: 0;
+  border: 2px solid var(--flock-amber);
+  box-shadow: 0 0 12px var(--flock-amber-glow);
 }
 
 .flock-detail-info {
@@ -783,33 +984,44 @@ body {
 }
 
 .flock-detail-name {
-  font-size: 16px;
+  font-family: var(--flock-font-mono);
+  font-size: 14px;
   font-weight: 700;
   color: var(--flock-text-primary);
-  margin-bottom: 1px;
+  margin-bottom: 2px;
 }
 
 .flock-detail-username {
-  font-size: 13px;
-  color: var(--flock-text-secondary);
-  margin-bottom: 4px;
+  font-family: var(--flock-font-mono);
+  font-size: 12px;
+  color: var(--flock-amber);
+  margin-bottom: 6px;
 }
 
 .flock-detail-stats {
   display: flex;
-  gap: 12px;
-  font-size: 12px;
+  gap: 16px;
+  font-family: var(--flock-font-mono);
+  font-size: 11px;
   color: var(--flock-text-tertiary);
 }
 
+.flock-detail-stats span {
+  color: var(--flock-text-primary);
+  font-weight: 600;
+}
+
 .flock-detail-bio {
-  font-size: 13px;
+  font-family: var(--flock-font-mono);
+  font-size: 11px;
   color: var(--flock-text-secondary);
-  line-height: 1.5;
+  line-height: 1.6;
   padding: 10px 12px;
   background: var(--flock-bg-secondary);
-  border-radius: var(--flock-radius-md);
-  margin-bottom: 12px;
+  border: 1px solid var(--flock-border);
+  border-left: 3px solid var(--flock-amber);
+  border-radius: 0;
+  margin-bottom: 16px;
 }
 
 .flock-detail-section {
@@ -817,67 +1029,81 @@ body {
 }
 
 .flock-detail-section h3 {
-  font-size: 11px;
+  font-family: var(--flock-font-mono);
+  font-size: 9px;
   font-weight: 600;
-  color: var(--flock-text-tertiary);
+  color: var(--flock-amber);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 1px;
   margin-bottom: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px dashed var(--flock-border);
 }
 
+/* Pipeline Stages - Terminal Style */
 .flock-stage-pills {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 4px;
 }
 
 .flock-stage-pill {
-  padding: 5px 10px;
-  background: var(--flock-bg-secondary);
-  border: 1px solid var(--flock-border-subtle);
-  border-radius: var(--flock-radius-full);
-  color: var(--flock-text-secondary);
-  font-family: var(--flock-font-sans);
-  font-size: 11px;
+  padding: 4px 8px;
+  background: transparent;
+  border: 1px solid var(--flock-border);
+  border-radius: 0;
+  color: var(--flock-text-tertiary);
+  font-family: var(--flock-font-mono);
+  font-size: 9px;
   font-weight: 500;
-  text-transform: capitalize;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
   cursor: pointer;
   transition: all var(--flock-transition);
 }
 
 .flock-stage-pill:hover {
   background: var(--flock-bg-tertiary);
-  border-color: var(--flock-border);
+  border-color: var(--flock-amber);
+  color: var(--flock-amber);
 }
 
 .flock-stage-pill.active {
   background: var(--flock-amber);
   border-color: var(--flock-amber);
   color: #000;
+  box-shadow: 0 0 8px var(--flock-amber-glow);
 }
 
+/* Tags - Terminal Style */
 .flock-tag-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 4px;
 }
 
 .flock-tag {
-  padding: 4px 10px;
-  background: var(--flock-amber-light);
-  border-radius: var(--flock-radius-full);
+  padding: 3px 8px;
+  background: transparent;
+  border: 1px solid var(--flock-amber);
+  border-radius: 0;
   color: var(--flock-amber);
-  font-size: 11px;
+  font-family: var(--flock-font-mono);
+  font-size: 9px;
   font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .flock-detail-notes {
-  font-size: 13px;
+  font-family: var(--flock-font-mono);
+  font-size: 11px;
   color: var(--flock-text-secondary);
-  line-height: 1.5;
+  line-height: 1.6;
   padding: 10px 12px;
   background: var(--flock-bg-secondary);
-  border-radius: var(--flock-radius-md);
+  border: 1px solid var(--flock-border);
+  border-radius: 0;
   white-space: pre-wrap;
 }
 
@@ -934,11 +1160,11 @@ body {
 }
 
 /* ================================
-   PIPELINE VIEW
+   PIPELINE VIEW - Terminal Kanban
    ================================ */
 .flock-pipeline-view {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   overflow-x: auto;
   padding-bottom: 8px;
 }
@@ -947,7 +1173,7 @@ body {
   flex: 0 0 130px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .flock-pipeline-header {
@@ -956,29 +1182,32 @@ body {
   justify-content: space-between;
   padding: 8px 10px;
   background: var(--flock-bg-secondary);
-  border-radius: var(--flock-radius-md);
-  border: 1px solid var(--flock-border-subtle);
+  border-radius: 0;
+  border: 1px solid var(--flock-border);
+  border-top: 2px solid var(--flock-amber);
 }
 
 .flock-pipeline-title {
-  font-size: 11px;
+  font-family: var(--flock-font-mono);
+  font-size: 9px;
   font-weight: 600;
-  color: var(--flock-text-secondary);
+  color: var(--flock-text-tertiary);
   text-transform: uppercase;
-  letter-spacing: 0.3px;
+  letter-spacing: 1px;
 }
 
 .flock-pipeline-count {
   font-family: var(--flock-font-mono);
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--flock-amber);
+  text-shadow: 0 0 8px var(--flock-amber-glow);
 }
 
 .flock-pipeline-items {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 
 .flock-pipeline-item {
@@ -987,25 +1216,30 @@ body {
   gap: 6px;
   padding: 6px 8px;
   background: var(--flock-bg-secondary);
-  border-radius: var(--flock-radius-md);
+  border: 1px solid var(--flock-border);
+  border-left: 2px solid transparent;
+  border-radius: 0;
   cursor: pointer;
   transition: all var(--flock-transition);
 }
 
 .flock-pipeline-item:hover {
-  background: var(--flock-bg-tertiary);
+  background: linear-gradient(90deg, rgba(245, 158, 11, 0.06) 0%, transparent 50%);
+  border-left-color: var(--flock-amber);
 }
 
 .flock-pipeline-avatar {
-  width: 24px;
-  height: 24px;
-  border-radius: var(--flock-radius-full);
+  width: 22px;
+  height: 22px;
+  border-radius: 2px;
   background: var(--flock-bg-tertiary);
   object-fit: cover;
+  border: 1px solid var(--flock-border);
 }
 
 .flock-pipeline-name {
-  font-size: 11px;
+  font-family: var(--flock-font-mono);
+  font-size: 10px;
   font-weight: 500;
   color: var(--flock-text-primary);
   white-space: nowrap;
@@ -1014,7 +1248,7 @@ body {
 }
 
 /* ================================
-   EMPTY STATE
+   EMPTY STATE - Terminal Style
    ================================ */
 .flock-empty-state {
   display: flex;
@@ -1026,34 +1260,40 @@ body {
 }
 
 .flock-empty-icon-wrap {
-  width: 64px;
-  height: 64px;
+  width: 56px;
+  height: 56px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--flock-amber-light);
-  border-radius: var(--flock-radius-full);
+  background: transparent;
+  border: 2px solid var(--flock-amber);
+  border-radius: 2px;
   margin-bottom: 16px;
+  box-shadow: 0 0 20px var(--flock-amber-glow);
 }
 
 .flock-empty-icon {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   color: var(--flock-amber);
 }
 
 .flock-empty-text {
-  font-size: 16px;
+  font-family: var(--flock-font-mono);
+  font-size: 14px;
   font-weight: 600;
-  color: var(--flock-text-primary);
+  color: var(--flock-amber);
   margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
 }
 
 .flock-empty-subtext {
-  font-size: 13px;
+  font-family: var(--flock-font-mono);
+  font-size: 11px;
   color: var(--flock-text-secondary);
   max-width: 260px;
-  line-height: 1.5;
+  line-height: 1.6;
   margin-bottom: 20px;
 }
 
@@ -1061,17 +1301,17 @@ body {
   display: inline-block;
   padding: 2px 6px;
   background: var(--flock-bg-tertiary);
-  border: 1px solid var(--flock-border);
-  border-radius: var(--flock-radius-sm);
+  border: 1px solid var(--flock-amber);
+  border-radius: 0;
   font-family: var(--flock-font-mono);
-  font-size: 11px;
-  color: var(--flock-text-primary);
+  font-size: 10px;
+  color: var(--flock-amber);
 }
 
 .flock-empty-steps {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   width: 100%;
   max-width: 280px;
 }
@@ -1114,7 +1354,7 @@ body {
 }
 
 /* ================================
-   LOADING STATE
+   LOADING STATE - Terminal Processing
    ================================ */
 .flock-loading-state {
   display: flex;
@@ -1126,13 +1366,14 @@ body {
 }
 
 .flock-spinner {
-  width: 28px;
-  height: 28px;
-  border: 3px solid var(--flock-bg-tertiary);
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--flock-border);
   border-top-color: var(--flock-amber);
-  border-radius: 50%;
-  animation: flock-spin 0.8s linear infinite;
+  border-radius: 2px;
+  animation: flock-spin 0.6s linear infinite;
   margin-bottom: 12px;
+  box-shadow: 0 0 12px var(--flock-amber-glow);
 }
 
 @keyframes flock-spin {
@@ -1141,19 +1382,34 @@ body {
 }
 
 .flock-loading-state p {
-  font-size: 13px;
+  font-family: var(--flock-font-mono);
+  font-size: 11px;
   color: var(--flock-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.flock-loading-state p::after {
+  content: '...';
+  animation: flock-dots 1.5s steps(4, end) infinite;
+}
+
+@keyframes flock-dots {
+  0%, 20% { content: ''; }
+  40% { content: '.'; }
+  60% { content: '..'; }
+  80%, 100% { content: '...'; }
 }
 
 /* ================================
-   FOOTER
+   FOOTER - Terminal Status Bar
    ================================ */
 .flock-footer {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
-  padding: 8px 12px;
+  padding: 6px 12px;
   background: var(--flock-bg-secondary);
   border-top: 1px solid var(--flock-border);
 }
@@ -1162,21 +1418,24 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 10px;
-  border: none;
+  padding: 4px 10px;
+  border: 1px solid transparent;
   background: transparent;
-  border-radius: var(--flock-radius-full);
-  color: var(--flock-text-secondary);
-  font-family: var(--flock-font-sans);
-  font-size: 11px;
+  border-radius: 2px;
+  color: var(--flock-text-tertiary);
+  font-family: var(--flock-font-mono);
+  font-size: 9px;
   font-weight: 500;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
   cursor: pointer;
   transition: all var(--flock-transition);
 }
 
 .flock-footer-btn:hover {
-  background: var(--flock-bg-tertiary);
-  color: var(--flock-text-primary);
+  background: var(--flock-amber-light);
+  border-color: var(--flock-amber);
+  color: var(--flock-amber);
 }
 
 .flock-footer-btn svg {
@@ -1186,23 +1445,25 @@ body {
 
 .flock-footer-divider {
   width: 1px;
-  height: 12px;
+  height: 10px;
   background: var(--flock-border);
 }
 
 .flock-footer-version {
   font-family: var(--flock-font-mono);
-  font-size: 10px;
+  font-size: 9px;
   color: var(--flock-text-tertiary);
+  letter-spacing: 0.5px;
 }
 
 /* ================================
-   MODAL
+   MODAL - Terminal Dialog
    ================================ */
 .flock-modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.8);
+  background: rgba(0, 0, 0, 0.9);
+  backdrop-filter: blur(2px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1213,9 +1474,9 @@ body {
 .flock-modal {
   width: 320px;
   background: var(--flock-bg-secondary);
-  border: 1px solid var(--flock-border);
-  border-radius: var(--flock-radius-lg);
-  box-shadow: var(--flock-shadow-lg);
+  border: 1px solid var(--flock-amber);
+  border-radius: 2px;
+  box-shadow: 0 0 30px var(--flock-amber-glow), 0 20px 60px rgba(0, 0, 0, 0.5);
   animation: flock-scale-in 0.2s ease-out;
 }
 
@@ -1228,34 +1489,39 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--flock-border-subtle);
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--flock-border);
+  background: linear-gradient(90deg, rgba(245, 158, 11, 0.08) 0%, transparent 50%);
 }
 
 .flock-modal-header h3 {
-  font-size: 15px;
+  font-family: var(--flock-font-mono);
+  font-size: 12px;
   font-weight: 600;
-  color: var(--flock-text-primary);
+  color: var(--flock-amber);
+  text-transform: uppercase;
+  letter-spacing: 1px;
 }
 
 .flock-modal-close {
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
   background: transparent;
-  border: none;
-  border-radius: var(--flock-radius-full);
-  color: var(--flock-text-secondary);
-  font-size: 20px;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  color: var(--flock-text-tertiary);
+  font-size: 16px;
   cursor: pointer;
   transition: all var(--flock-transition);
 }
 
 .flock-modal-close:hover {
-  background: var(--flock-bg-tertiary);
-  color: var(--flock-text-primary);
+  background: rgba(239, 68, 68, 0.1);
+  border-color: var(--flock-error);
+  color: var(--flock-error);
 }
 
 .flock-modal-body {
@@ -1271,12 +1537,15 @@ body {
 }
 
 .flock-shortcut-section h4 {
-  font-size: 10px;
+  font-family: var(--flock-font-mono);
+  font-size: 9px;
   font-weight: 600;
-  color: var(--flock-text-tertiary);
+  color: var(--flock-amber);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 1px;
   margin-bottom: 10px;
+  padding-bottom: 4px;
+  border-bottom: 1px dashed var(--flock-border);
 }
 
 .flock-shortcut {
@@ -1284,7 +1553,7 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 8px 0;
-  border-bottom: 1px solid var(--flock-border-subtle);
+  border-bottom: 1px solid var(--flock-border);
 }
 
 .flock-shortcut:last-child {
@@ -1557,7 +1826,7 @@ body {
 }
 
 /* ================================
-   REMINDERS VIEW
+   REMINDERS VIEW - Terminal Alerts
    ================================ */
 .flock-reminders-view {
   display: flex;
@@ -1579,9 +1848,11 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--flock-amber-light);
-  border-radius: var(--flock-radius-full);
+  background: transparent;
+  border: 2px solid var(--flock-amber);
+  border-radius: 2px;
   margin-bottom: 12px;
+  box-shadow: 0 0 16px var(--flock-amber-glow);
 }
 
 .flock-reminders-empty-icon svg {
@@ -1591,12 +1862,13 @@ body {
 }
 
 .flock-reminders-empty p {
+  font-family: var(--flock-font-mono);
   color: var(--flock-text-secondary);
-  font-size: 14px;
+  font-size: 12px;
 }
 
 .flock-reminders-empty-hint {
-  font-size: 12px !important;
+  font-size: 11px !important;
   color: var(--flock-text-tertiary) !important;
   margin-top: 4px;
 }
@@ -1604,42 +1876,45 @@ body {
 .flock-reminder-section {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .flock-reminder-section-header {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 11px;
+  font-family: var(--flock-font-mono);
+  font-size: 9px;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  padding: 4px 0;
+  letter-spacing: 1px;
+  padding: 6px 0;
+  border-bottom: 1px dashed var(--flock-border);
 }
 
 .flock-reminder-section-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: var(--flock-radius-full);
+  width: 6px;
+  height: 6px;
+  border-radius: 0;
 }
 
-.flock-reminder-overdue .flock-reminder-section-dot { background: var(--flock-error); }
+.flock-reminder-overdue .flock-reminder-section-dot { background: var(--flock-error); box-shadow: 0 0 8px var(--flock-error); }
 .flock-reminder-overdue { color: var(--flock-error); }
 
-.flock-reminder-today .flock-reminder-section-dot { background: var(--flock-amber); }
+.flock-reminder-today .flock-reminder-section-dot { background: var(--flock-amber); box-shadow: 0 0 8px var(--flock-amber-glow); }
 .flock-reminder-today { color: var(--flock-amber); }
 
-.flock-reminder-upcoming .flock-reminder-section-dot { background: var(--flock-info); }
+.flock-reminder-upcoming .flock-reminder-section-dot { background: var(--flock-info); box-shadow: 0 0 8px rgba(59, 130, 246, 0.5); }
 .flock-reminder-upcoming { color: var(--flock-info); }
 
 .flock-reminder-section-count {
   font-family: var(--flock-font-mono);
   font-size: 10px;
   padding: 2px 6px;
-  background: var(--flock-bg-tertiary);
-  border-radius: var(--flock-radius-full);
-  color: var(--flock-text-secondary);
+  background: transparent;
+  border: 1px solid currentColor;
+  border-radius: 0;
+  color: inherit;
 }
 
 .flock-reminder-card {
@@ -1648,36 +1923,38 @@ body {
   gap: 10px;
   padding: 10px 12px;
   background: var(--flock-bg-secondary);
-  border-radius: var(--flock-radius-lg);
-  border: 1px solid var(--flock-border-subtle);
+  border-radius: 0;
+  border: 1px solid var(--flock-border);
+  border-left: 3px solid transparent;
   cursor: pointer;
   transition: all var(--flock-transition);
 }
 
 .flock-reminder-card:hover {
-  background: var(--flock-bg-tertiary);
+  background: linear-gradient(90deg, rgba(245, 158, 11, 0.06) 0%, transparent 50%);
   border-color: var(--flock-border);
 }
 
 .flock-reminder-card.flock-reminder-overdue {
-  border-left: 3px solid var(--flock-error);
+  border-left-color: var(--flock-error);
 }
 
 .flock-reminder-card.flock-reminder-today {
-  border-left: 3px solid var(--flock-amber);
+  border-left-color: var(--flock-amber);
 }
 
 .flock-reminder-card.flock-reminder-upcoming {
-  border-left: 3px solid var(--flock-info);
+  border-left-color: var(--flock-info);
 }
 
 .flock-reminder-avatar {
-  width: 36px;
-  height: 36px;
-  border-radius: var(--flock-radius-full);
+  width: 32px;
+  height: 32px;
+  border-radius: 2px;
   background: var(--flock-bg-tertiary);
   object-fit: cover;
   flex-shrink: 0;
+  border: 1px solid var(--flock-border);
 }
 
 .flock-reminder-info {
@@ -1686,7 +1963,8 @@ body {
 }
 
 .flock-reminder-name {
-  font-size: 13px;
+  font-family: var(--flock-font-mono);
+  font-size: 12px;
   font-weight: 600;
   color: var(--flock-text-primary);
   white-space: nowrap;
@@ -1695,7 +1973,8 @@ body {
 }
 
 .flock-reminder-note {
-  font-size: 11px;
+  font-family: var(--flock-font-mono);
+  font-size: 10px;
   color: var(--flock-text-secondary);
   white-space: nowrap;
   overflow: hidden;
@@ -1711,10 +1990,11 @@ body {
 
 .flock-reminder-date {
   font-family: var(--flock-font-mono);
-  font-size: 10px;
+  font-size: 9px;
   padding: 3px 8px;
-  background: var(--flock-bg-tertiary);
-  border-radius: var(--flock-radius-full);
+  background: transparent;
+  border: 1px solid var(--flock-border);
+  border-radius: 0;
   color: var(--flock-text-secondary);
 }
 
@@ -1725,15 +2005,16 @@ body {
   width: 24px;
   height: 24px;
   background: transparent;
-  border: none;
-  border-radius: var(--flock-radius-full);
+  border: 1px solid transparent;
+  border-radius: 2px;
   color: var(--flock-text-tertiary);
   cursor: pointer;
   transition: all var(--flock-transition);
 }
 
 .flock-reminder-dismiss:hover {
-  background: var(--flock-bg-elevated);
+  background: rgba(239, 68, 68, 0.1);
+  border-color: var(--flock-error);
   color: var(--flock-error);
 }
 
@@ -1743,7 +2024,7 @@ body {
 }
 
 /* ================================
-   LISTS VIEW
+   LISTS VIEW - Terminal Directories
    ================================ */
 .flock-lists-view {
   display: flex;
@@ -1763,17 +2044,21 @@ body {
   padding: 6px 12px;
   background: var(--flock-amber);
   border: none;
-  border-radius: var(--flock-radius-full);
+  border-radius: 2px;
   color: #000;
-  font-family: var(--flock-font-sans);
-  font-size: 12px;
+  font-family: var(--flock-font-mono);
+  font-size: 10px;
   font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
   cursor: pointer;
   transition: all var(--flock-transition);
+  box-shadow: 0 0 12px var(--flock-amber-glow);
 }
 
 .flock-lists-add-btn:hover {
   background: var(--flock-amber-hover);
+  box-shadow: 0 0 16px var(--flock-amber-glow);
 }
 
 .flock-lists-add-btn svg {
@@ -1784,32 +2069,34 @@ body {
 .flock-lists-grid {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .flock-list-card {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 14px;
+  padding: 10px 14px;
   background: var(--flock-bg-secondary);
-  border-radius: var(--flock-radius-lg);
-  border: 1px solid var(--flock-border-subtle);
+  border-radius: 0;
+  border: 1px solid var(--flock-border);
+  border-left: 3px solid transparent;
   cursor: pointer;
   transition: all var(--flock-transition);
 }
 
 .flock-list-card:hover {
-  background: var(--flock-bg-tertiary);
+  background: linear-gradient(90deg, rgba(245, 158, 11, 0.06) 0%, transparent 50%);
   border-color: var(--flock-border);
-  transform: translateX(2px);
+  border-left-color: var(--flock-amber);
 }
 
 .flock-list-color {
-  width: 12px;
-  height: 12px;
-  border-radius: var(--flock-radius-full);
+  width: 8px;
+  height: 8px;
+  border-radius: 0;
   flex-shrink: 0;
+  box-shadow: 0 0 6px currentColor;
 }
 
 .flock-list-info {
@@ -1818,25 +2105,27 @@ body {
 }
 
 .flock-list-name {
-  font-size: 13px;
+  font-family: var(--flock-font-mono);
+  font-size: 12px;
   font-weight: 600;
   color: var(--flock-text-primary);
 }
 
 .flock-list-count {
-  font-size: 11px;
-  color: var(--flock-text-tertiary);
+  font-family: var(--flock-font-mono);
+  font-size: 10px;
+  color: var(--flock-amber);
 }
 
 .flock-list-delete {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   background: transparent;
-  border: none;
-  border-radius: var(--flock-radius-full);
+  border: 1px solid transparent;
+  border-radius: 2px;
   color: var(--flock-text-tertiary);
   cursor: pointer;
   opacity: 0;
@@ -1848,7 +2137,8 @@ body {
 }
 
 .flock-list-delete:hover {
-  background: var(--flock-bg-elevated);
+  background: rgba(239, 68, 68, 0.1);
+  border-color: var(--flock-error);
   color: var(--flock-error);
 }
 
@@ -1863,11 +2153,12 @@ body {
   align-items: center;
   padding: 48px 24px;
   text-align: center;
+  font-family: var(--flock-font-mono);
   color: var(--flock-text-secondary);
 }
 
 .flock-lists-empty-hint {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--flock-text-tertiary);
   margin-top: 4px;
 }

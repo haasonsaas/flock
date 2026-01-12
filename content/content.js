@@ -1175,9 +1175,8 @@ async function injectSaveButton() {
     setTimeout(() => document.addEventListener('click', handleOutsideClick), 0);
   });
 
-  // Insert at start of actions container (same row as other buttons)
-  const container = userActions.parentElement;
-  container.insertBefore(btn, container.firstChild);
+  // Insert right before the userActions (so it appears next to Follow button)
+  userActions.parentElement.insertBefore(btn, userActions);
 }
 
 // ================================
@@ -2288,12 +2287,12 @@ const QuickAdd = {
     }
   },
 
-  // Check if we're on a timeline page (not individual tweet pages)
+  // Check if we're on a timeline page (not individual tweet pages or profile sub-pages)
   isTimelinePage() {
     const path = window.location.pathname;
+    // Only match actual timeline/feed pages, NOT profile sub-pages like followers/following/likes
     return path === '/home' ||
            path === '/' ||
-           path.match(/^\/[^/]+\/(following|followers|likes)$/) ||
            path.match(/^\/search/);
   },
 
