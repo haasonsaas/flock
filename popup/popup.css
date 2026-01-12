@@ -80,7 +80,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
+  padding: 10px 12px;
   background: linear-gradient(180deg, var(--flock-bg-secondary) 0%, var(--flock-bg-primary) 100%);
   border-bottom: 1px solid var(--flock-border);
 }
@@ -138,7 +138,7 @@ body {
    SEARCH BAR
    ================================ */
 .flock-search-bar {
-  padding: 0 16px;
+  padding: 0 12px;
   max-height: 0;
   overflow: hidden;
   transition: all var(--flock-transition);
@@ -146,25 +146,26 @@ body {
 }
 
 .flock-search-bar.flock-visible {
-  max-height: 180px;
-  padding: 0 16px 12px;
+  max-height: 160px;
+  padding: 0 12px 10px;
 }
 
 .flock-search-container {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .flock-search-input {
   flex: 1;
-  padding: 10px 14px;
+  min-width: 0;
+  padding: 8px 12px;
   background: var(--flock-bg-secondary);
   border: 1px solid var(--flock-border);
   border-radius: var(--flock-radius-full);
   color: var(--flock-text-primary);
   font-family: var(--flock-font-sans);
-  font-size: 13px;
+  font-size: 12px;
   transition: all var(--flock-transition);
 }
 
@@ -178,15 +179,15 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
   background: transparent;
   border: 1px solid var(--flock-border);
   border-radius: var(--flock-radius-full);
   color: var(--flock-text-tertiary);
   cursor: pointer;
   transition: all var(--flock-transition);
-  flex-shrink: 0;
 }
 
 .flock-search-save:hover {
@@ -294,8 +295,8 @@ body {
 .flock-stats {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  padding: 12px 16px;
+  gap: 6px;
+  padding: 10px 12px;
   background: var(--flock-bg-primary);
 }
 
@@ -303,9 +304,9 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 12px 8px;
+  padding: 10px 6px;
   background: var(--flock-bg-secondary);
-  border-radius: var(--flock-radius-lg);
+  border-radius: var(--flock-radius-md);
   border: 1px solid var(--flock-border-subtle);
   transition: all var(--flock-transition);
 }
@@ -347,7 +348,7 @@ body {
 .flock-tabs {
   display: flex;
   gap: 2px;
-  padding: 0 12px 8px;
+  padding: 0 12px 6px;
   background: var(--flock-bg-primary);
   overflow-x: auto;
   scrollbar-width: none;
@@ -360,13 +361,13 @@ body {
 
 .flock-tab {
   flex-shrink: 0;
-  padding: 6px 10px;
+  padding: 5px 8px;
   border: none;
   background: transparent;
   border-radius: var(--flock-radius-full);
   color: var(--flock-text-secondary);
   font-family: var(--flock-font-sans);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   cursor: pointer;
   transition: all var(--flock-transition);
@@ -388,8 +389,8 @@ body {
    ================================ */
 .flock-filter-bar {
   display: flex;
-  gap: 8px;
-  padding: 0 16px 10px;
+  gap: 4px;
+  padding: 0 12px 8px;
   background: var(--flock-bg-primary);
   position: relative;
   z-index: 100;
@@ -397,13 +398,14 @@ body {
 
 .flock-filter-select {
   flex: 1;
-  padding: 6px 10px;
+  min-width: 0;
+  padding: 5px 6px;
   background: var(--flock-bg-secondary);
   border: 1px solid var(--flock-border-subtle);
-  border-radius: var(--flock-radius-md);
+  border-radius: var(--flock-radius-sm);
   color: var(--flock-text-primary);
   font-family: var(--flock-font-sans);
-  font-size: 12px;
+  font-size: 11px;
   cursor: pointer;
   transition: all var(--flock-transition);
 }
@@ -423,7 +425,7 @@ body {
 .flock-content {
   flex: 1;
   overflow-y: auto;
-  padding: 0 16px 16px;
+  padding: 0 12px 12px;
   position: relative;
   z-index: 1;
 }
@@ -1150,8 +1152,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  padding: 10px 16px;
+  gap: 10px;
+  padding: 8px 12px;
   background: var(--flock-bg-secondary);
   border-top: 1px solid var(--flock-border);
 }
@@ -2319,8 +2321,9 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
   background: transparent;
   border: 1px solid var(--flock-border);
   border-radius: var(--flock-radius-md);
@@ -2351,8 +2354,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 10px 16px;
+  gap: 8px;
+  padding: 8px 12px;
   background: linear-gradient(135deg, var(--flock-bg-elevated) 0%, var(--flock-bg-tertiary) 100%);
   border-bottom: 1px solid var(--flock-amber);
   animation: slideDown 0.2s ease-out;
@@ -2372,17 +2375,18 @@ body {
 .flock-bulk-left {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
 }
 
 .flock-bulk-select-all {
-  padding: 5px 12px;
+  padding: 4px 8px;
   background: transparent;
   border: 1px solid var(--flock-border);
   border-radius: var(--flock-radius-full);
   color: var(--flock-text-secondary);
   font-family: var(--flock-font-sans);
-  font-size: 12px;
+  font-size: 10px;
+  white-space: nowrap;
   cursor: pointer;
   transition: all var(--flock-transition);
 }
@@ -2393,31 +2397,39 @@ body {
 }
 
 .flock-bulk-count {
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 600;
   color: var(--flock-amber);
+  white-space: nowrap;
 }
 
 .flock-bulk-actions {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
 }
 
 .flock-bulk-action {
   display: flex;
   align-items: center;
-  gap: 5px;
-  padding: 6px 10px;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
   background: var(--flock-bg-secondary);
   border: 1px solid var(--flock-border);
-  border-radius: var(--flock-radius-md);
+  border-radius: var(--flock-radius-sm);
   color: var(--flock-text-secondary);
   font-family: var(--flock-font-sans);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 500;
   cursor: pointer;
   transition: all var(--flock-transition);
+}
+
+/* Hide text labels in bulk actions, show only icons */
+.flock-bulk-action {
+  font-size: 0;
 }
 
 .flock-bulk-action:hover {
@@ -2570,21 +2582,21 @@ body {
 .flock-analytics-view {
   display: flex;
   flex-direction: column;
-  padding: 0 16px 16px;
+  padding: 0;
   overflow-y: auto;
 }
 
 .flock-analytics-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: 8px;
 }
 
 .flock-analytics-card {
   background: var(--flock-bg-secondary);
   border: 1px solid var(--flock-border);
-  border-radius: var(--flock-radius-lg);
-  padding: 14px;
+  border-radius: var(--flock-radius-md);
+  padding: 10px;
 }
 
 .flock-analytics-card.flock-analytics-health,
@@ -2594,12 +2606,12 @@ body {
 }
 
 .flock-analytics-title {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   color: var(--flock-text-tertiary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 /* Health Meter */
@@ -2972,12 +2984,14 @@ body {
 
 .flock-network-legend {
   position: absolute;
-  bottom: 6px;
-  left: 6px;
+  bottom: 4px;
+  left: 4px;
+  right: 4px;
   display: flex;
-  gap: 8px;
-  padding: 6px 10px;
-  background: rgba(0, 0, 0, 0.8);
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px 6px;
+  background: rgba(0, 0, 0, 0.85);
   border-radius: var(--flock-radius-sm);
   backdrop-filter: blur(8px);
 }
@@ -2986,7 +3000,7 @@ body {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
 }
 
 .flock-legend-title {
@@ -3012,30 +3026,30 @@ body {
    ================================ */
 
 .flock-export-modal {
-  width: 340px;
+  width: 320px;
 }
 
 .flock-export-info {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--flock-text-secondary);
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .flock-export-options {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  gap: 8px;
 }
 
 .flock-export-option {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 16px 12px;
+  gap: 6px;
+  padding: 12px 10px;
   background: var(--flock-bg-secondary);
   border: 1px solid var(--flock-border);
-  border-radius: var(--flock-radius-lg);
+  border-radius: var(--flock-radius-md);
   color: var(--flock-text-primary);
   cursor: pointer;
   transition: all var(--flock-transition);

@@ -2288,9 +2288,21 @@ const QuickAdd = {
     }
   },
 
+  // Check if we're on a timeline page (not individual tweet pages)
+  isTimelinePage() {
+    const path = window.location.pathname;
+    return path === '/home' ||
+           path === '/' ||
+           path.match(/^\/[^/]+\/(following|followers|likes)$/) ||
+           path.match(/^\/search/);
+  },
+
   init() {
     // Listen for hover on tweets
     document.addEventListener('mouseover', (e) => {
+      // Only work on timeline pages, not individual tweet pages
+      if (!this.isTimelinePage()) return;
+
       const tweet = e.target.closest('article[data-testid="tweet"]');
       if (!tweet) return;
 
