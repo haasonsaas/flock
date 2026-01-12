@@ -600,6 +600,10 @@ async function showContactDetail(username) {
     .sort((a, b) => b.timestamp - a.timestamp)
     .slice(0, 10);
 
+  // Fetch feed intelligence
+  const feedIntelResult = await chrome.storage.local.get('feedIntelligence');
+  const feedIntel = feedIntelResult.feedIntelligence?.[username] || null;
+
   const lists = await getAllLists();
   const contactLists = lists.filter(l => contact.listIds?.includes(l.id));
 
@@ -709,6 +713,40 @@ async function showContactDetail(username) {
         </div>
       ` : '<p class="flock-no-activity">No recorded interactions yet</p>'}
     </div>
+    ${feedIntel ? `
+      <div class="flock-detail-section flock-intel-section">
+        <h3>${Icons.sparkle} Feed Intelligence</h3>
+        <div class="flock-intel-grid">
+          <div class="flock-intel-stat">
+            <span class="flock-intel-value">${feedIntel.totalAppearances || 0}</span>
+            <span class="flock-intel-label">feed appearances</span>
+          </div>
+          <div class="flock-intel-stat">
+            <span class="flock-intel-value">${feedIntel.lastSeen ? timeAgo(feedIntel.lastSeen) : 'Never'}</span>
+            <span class="flock-intel-label">last in feed</span>
+          </div>
+          <div class="flock-intel-stat">
+            <span class="flock-intel-value">${formatCount(feedIntel.avgLikes) || '—'}</span>
+            <span class="flock-intel-label">avg likes</span>
+          </div>
+          <div class="flock-intel-stat">
+            <span class="flock-intel-value">${formatCount(feedIntel.avgViews) || '—'}</span>
+            <span class="flock-intel-label">avg views</span>
+          </div>
+        </div>
+        ${feedIntel.appearances?.length > 0 ? `
+          <div class="flock-intel-recent">
+            <span class="flock-intel-recent-label">Recent tweets seen:</span>
+            ${feedIntel.appearances.slice(-3).reverse().map(a => `
+              <div class="flock-intel-tweet">
+                <span class="flock-intel-tweet-preview">${escapeHtml(a.preview?.substring(0, 80) || '...')}${a.preview?.length > 80 ? '...' : ''}</span>
+                <span class="flock-intel-tweet-metrics">${formatCount(a.metrics?.likes) || 0} likes · ${formatCount(a.metrics?.views) || 0} views</span>
+              </div>
+            `).join('')}
+          </div>
+        ` : ''}
+      </div>
+    ` : ''}
     <div class="flock-detail-meta">
       Added ${new Date(contact.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
     </div>

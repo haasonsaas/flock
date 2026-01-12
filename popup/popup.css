@@ -1151,6 +1151,95 @@ body::before {
   text-align: center;
 }
 
+/* Feed Intelligence Section */
+.flock-intel-section h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.flock-intel-section h3 svg {
+  width: 14px;
+  height: 14px;
+  color: var(--flock-primary);
+}
+
+.flock-intel-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.flock-intel-stat {
+  background: var(--flock-bg-secondary);
+  border: 1px solid var(--flock-border);
+  border-radius: 2px;
+  padding: 10px;
+  text-align: center;
+}
+
+.flock-intel-value {
+  display: block;
+  font-family: var(--flock-font-mono);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--flock-primary);
+  text-shadow: 0 0 10px var(--flock-primary-glow);
+}
+
+.flock-intel-label {
+  display: block;
+  font-family: var(--flock-font-mono);
+  font-size: 9px;
+  color: var(--flock-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 2px;
+}
+
+.flock-intel-recent {
+  border-top: 1px solid var(--flock-border-subtle);
+  padding-top: 10px;
+}
+
+.flock-intel-recent-label {
+  display: block;
+  font-family: var(--flock-font-mono);
+  font-size: 10px;
+  color: var(--flock-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+.flock-intel-tweet {
+  background: var(--flock-bg-secondary);
+  border-left: 2px solid var(--flock-border);
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  transition: border-color 0.2s;
+}
+
+.flock-intel-tweet:hover {
+  border-left-color: var(--flock-primary);
+}
+
+.flock-intel-tweet-preview {
+  display: block;
+  font-size: 11px;
+  color: var(--flock-text-secondary);
+  line-height: 1.4;
+  margin-bottom: 4px;
+}
+
+.flock-intel-tweet-metrics {
+  display: block;
+  font-family: var(--flock-font-mono);
+  font-size: 10px;
+  color: var(--flock-text-tertiary);
+}
+
 .flock-detail-meta {
   font-size: 11px;
   color: var(--flock-text-tertiary);

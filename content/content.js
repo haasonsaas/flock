@@ -1687,6 +1687,242 @@ const InteractionTracker = {
 };
 
 // ================================
+// FEED INTELLIGENCE
+// ================================
+
+const FeedIntelligence = {
+  // Track which tweets we've already processed to avoid duplicates
+  processedTweets: new Set(),
+  // Cache for feed appearances
+  feedCache: new Map(),
+  // Throttle to avoid excessive storage writes
+  saveTimeout: null,
+
+  // Extract engagement metrics from a tweet element
+  extractEngagementMetrics(tweetElement) {
+    const metrics = {
+      replies: 0,
+      retweets: 0,
+      likes: 0,
+      views: 0,
+      bookmarks: 0
+    };
+
+    try {
+      // Find the engagement group
+      const group = tweetElement.querySelector('[role="group"]');
+      if (!group) return metrics;
+
+      const ariaLabel = group.getAttribute('aria-label') || '';
+
+      // Parse from aria-label like "6 replies, 35 likes, 4 bookmarks, 4237 views"
+      const replyMatch = ariaLabel.match(/(\d+)\s*repl/i);
+      const retweetMatch = ariaLabel.match(/(\d+)\s*repost/i);
+      const likeMatch = ariaLabel.match(/(\d+)\s*like/i);
+      const viewMatch = ariaLabel.match(/(\d+)\s*view/i);
+      const bookmarkMatch = ariaLabel.match(/(\d+)\s*bookmark/i);
+
+      if (replyMatch) metrics.replies = parseInt(replyMatch[1], 10);
+      if (retweetMatch) metrics.retweets = parseInt(retweetMatch[1], 10);
+      if (likeMatch) metrics.likes = parseInt(likeMatch[1], 10);
+      if (viewMatch) metrics.views = parseInt(viewMatch[1], 10);
+      if (bookmarkMatch) metrics.bookmarks = parseInt(bookmarkMatch[1], 10);
+    } catch (e) {
+      console.error('[Flock] Error extracting metrics:', e);
+    }
+
+    return metrics;
+  },
+
+  // Extract tweet content preview
+  extractTweetContent(tweetElement) {
+    try {
+      // Get the main tweet text
+      const textEl = tweetElement.querySelector('[data-testid="tweetText"]');
+      if (textEl) {
+        return textEl.textContent?.substring(0, 200) || '';
+      }
+    } catch (e) {
+      console.error('[Flock] Error extracting tweet content:', e);
+    }
+    return '';
+  },
+
+  // Extract tweet ID from the element
+  extractTweetId(tweetElement) {
+    try {
+      // Find the timestamp link which contains the tweet ID
+      const timeLink = tweetElement.querySelector('a[href*="/status/"]');
+      if (timeLink) {
+        const match = timeLink.href.match(/\/status\/(\d+)/);
+        if (match) return match[1];
+      }
+    } catch (e) {}
+    return null;
+  },
+
+  // Process a tweet if it's from a saved contact
+  async processTweet(tweetElement) {
+    const tweetId = this.extractTweetId(tweetElement);
+    if (!tweetId || this.processedTweets.has(tweetId)) return;
+    this.processedTweets.add(tweetId);
+
+    // Keep processed set from growing too large
+    if (this.processedTweets.size > 500) {
+      const entries = Array.from(this.processedTweets);
+      this.processedTweets = new Set(entries.slice(-250));
+    }
+
+    const author = InteractionTracker.getTweetAuthor(tweetElement);
+    if (!author || !InteractionTracker.isValidUsername(author)) return;
+
+    // Check if this is a saved contact
+    const contact = await getContact(author);
+    if (!contact) return; // Only track for saved contacts
+
+    // Extract intelligence
+    const metrics = this.extractEngagementMetrics(tweetElement);
+    const preview = this.extractTweetContent(tweetElement);
+    const timestamp = Date.now();
+
+    // Store this feed appearance
+    const appearance = {
+      tweetId,
+      username: author,
+      preview,
+      metrics,
+      seenAt: timestamp
+    };
+
+    // Add to cache and schedule save
+    if (!this.feedCache.has(author)) {
+      this.feedCache.set(author, []);
+    }
+    this.feedCache.get(author).push(appearance);
+
+    // Debounced save
+    clearTimeout(this.saveTimeout);
+    this.saveTimeout = setTimeout(() => this.saveFeedIntelligence(), 2000);
+
+    console.log(`[Flock] Feed: @${author} tweet in timeline (${metrics.likes} likes, ${metrics.views} views)`);
+  },
+
+  // Save accumulated feed intelligence to storage
+  async saveFeedIntelligence() {
+    if (this.feedCache.size === 0) return;
+
+    try {
+      const result = await chrome.storage.local.get('feedIntelligence');
+      const intelligence = result.feedIntelligence || {};
+
+      for (const [username, appearances] of this.feedCache) {
+        if (!intelligence[username]) {
+          intelligence[username] = {
+            appearances: [],
+            lastSeen: 0,
+            totalAppearances: 0,
+            avgLikes: 0,
+            avgViews: 0
+          };
+        }
+
+        const userIntel = intelligence[username];
+
+        // Add new appearances (keep last 50)
+        userIntel.appearances = [...userIntel.appearances, ...appearances].slice(-50);
+        userIntel.lastSeen = Math.max(userIntel.lastSeen, ...appearances.map(a => a.seenAt));
+        userIntel.totalAppearances += appearances.length;
+
+        // Calculate rolling averages
+        const recentAppearances = userIntel.appearances.slice(-20);
+        if (recentAppearances.length > 0) {
+          userIntel.avgLikes = Math.round(
+            recentAppearances.reduce((sum, a) => sum + (a.metrics?.likes || 0), 0) / recentAppearances.length
+          );
+          userIntel.avgViews = Math.round(
+            recentAppearances.reduce((sum, a) => sum + (a.metrics?.views || 0), 0) / recentAppearances.length
+          );
+        }
+      }
+
+      await chrome.storage.local.set({ feedIntelligence: intelligence });
+      this.feedCache.clear();
+
+    } catch (e) {
+      console.error('[Flock] Error saving feed intelligence:', e);
+    }
+  },
+
+  // Get feed intelligence for a contact
+  async getIntelligence(username) {
+    const result = await chrome.storage.local.get('feedIntelligence');
+    const intelligence = result.feedIntelligence || {};
+    return intelligence[username] || null;
+  },
+
+  // Start observing the timeline
+  startObserving() {
+    // Only observe on timeline pages
+    const shouldObserve = () => {
+      const path = window.location.pathname;
+      return path === '/home' || path === '/' || path.match(/^\/search/);
+    };
+
+    if (!shouldObserve()) {
+      // Re-check periodically for navigation
+      setTimeout(() => this.startObserving(), 2000);
+      return;
+    }
+
+    // Process existing tweets
+    const existingTweets = document.querySelectorAll('article[data-testid="tweet"]');
+    existingTweets.forEach(tweet => this.processTweet(tweet));
+
+    // Observe for new tweets
+    const observer = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        for (const node of mutation.addedNodes) {
+          if (node.nodeType !== Node.ELEMENT_NODE) continue;
+
+          // Check if the node itself is a tweet
+          if (node.matches?.('article[data-testid="tweet"]')) {
+            this.processTweet(node);
+          }
+
+          // Check for tweets inside the added node
+          const tweets = node.querySelectorAll?.('article[data-testid="tweet"]');
+          if (tweets) {
+            tweets.forEach(tweet => this.processTweet(tweet));
+          }
+        }
+      }
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+
+    // Handle navigation
+    let lastUrl = window.location.href;
+    setInterval(() => {
+      if (window.location.href !== lastUrl) {
+        lastUrl = window.location.href;
+        this.processedTweets.clear();
+
+        // Process tweets on new page after a delay
+        setTimeout(() => {
+          const tweets = document.querySelectorAll('article[data-testid="tweet"]');
+          tweets.forEach(tweet => this.processTweet(tweet));
+        }, 1000);
+      }
+    }, 500);
+
+    console.log('[Flock] Feed Intelligence enabled - tracking contact appearances in timeline');
+  }
+};
+
+// ================================
 // KEYBOARD SHORTCUTS
 // ================================
 
@@ -2680,8 +2916,11 @@ async function init() {
     TimelineIndicators.startObserving();
     TimelineIndicators.startCacheCleaner();
 
-    // Enable quick add from timeline
-    QuickAdd.init();
+    // Quick add from timeline disabled - too intrusive on hover
+    // QuickAdd.init();
+
+    // Enable feed intelligence (track contact appearances in timeline)
+    FeedIntelligence.startObserving();
 
     console.log('[Flock] Ready');
   } catch (error) {
