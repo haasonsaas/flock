@@ -525,6 +525,7 @@ body {
 .flock-icon-view { color: var(--flock-text-secondary); }
 .flock-icon-note { color: var(--flock-amber); }
 .flock-icon-quote { color: #00BA7C; }
+.flock-icon-bookmark { color: #1D9BF0; }
 
 .flock-activity-name {
   font-size: 12px;

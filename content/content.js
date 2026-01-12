@@ -34,6 +34,7 @@ const Icons = {
   follow: `<svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><circle cx="9" cy="7" r="4" stroke="currentColor" stroke-width="2" fill="none"/><path d="M19 8v6M22 11h-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>`,
   view: `<svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="currentColor" stroke-width="2" fill="none"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2" fill="none"/></svg>`,
   dm: `<svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" stroke="currentColor" stroke-width="2" fill="none"/><path d="M22 6l-10 7L2 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>`,
+  bookmark: `<svg viewBox="0 0 24 24"><path d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" stroke="currentColor" stroke-width="2" fill="none"/></svg>`,
 };
 
 // ================================
@@ -1143,19 +1144,29 @@ function handleNavigation() {
 // ================================
 
 const InteractionTracker = {
-  trackedActions: new Map(), // Better debounce tracking
+  trackedActions: new Map(),
+  pendingRetweet: null,
+  pendingQuote: null,
+  pendingReplyTo: null,
+
+  // Reserved usernames to filter out
+  RESERVED_USERNAMES: new Set([
+    'home', 'explore', 'search', 'notifications', 'messages', 'bookmarks',
+    'lists', 'i', 'settings', 'compose', 'intent', 'tos', 'privacy',
+    'topics', 'communities', 'premium', 'verified'
+  ]),
 
   // Debounce to prevent duplicate tracking
-  debounce(key, delay = 3000) {
+  debounce(key, delay = 5000) {
     const now = Date.now();
     const lastTime = this.trackedActions.get(key);
     if (lastTime && now - lastTime < delay) {
       return false;
     }
     this.trackedActions.set(key, now);
-    // Clean old entries
-    if (this.trackedActions.size > 100) {
-      const cutoff = now - 60000;
+    // Clean old entries periodically
+    if (this.trackedActions.size > 200) {
+      const cutoff = now - 120000;
       for (const [k, v] of this.trackedActions) {
         if (v < cutoff) this.trackedActions.delete(k);
       }
@@ -1163,104 +1174,186 @@ const InteractionTracker = {
     return true;
   },
 
-  // Extract username from a tweet element - improved detection
+  // Validate username format
+  isValidUsername(username) {
+    if (!username) return false;
+    if (this.RESERVED_USERNAMES.has(username.toLowerCase())) return false;
+    // Twitter usernames: 1-15 chars, alphanumeric + underscore
+    return /^[A-Za-z0-9_]{1,15}$/.test(username);
+  },
+
+  // Extract username from href
+  extractUsernameFromHref(href) {
+    if (!href) return null;
+    const match = href.match(/(?:twitter\.com|x\.com)\/([A-Za-z0-9_]{1,15})(?:\/|$|\?)/);
+    if (match && this.isValidUsername(match[1])) {
+      return match[1];
+    }
+    // Handle relative URLs
+    const relMatch = href.match(/^\/([A-Za-z0-9_]{1,15})(?:\/|$|\?)/);
+    if (relMatch && this.isValidUsername(relMatch[1])) {
+      return relMatch[1];
+    }
+    return null;
+  },
+
+  // Extract username from a tweet element - robust multi-strategy detection
   getTweetAuthor(tweetElement) {
     if (!tweetElement) return null;
 
-    // Try multiple selectors for robustness
-    const selectors = [
-      'a[href^="/"][role="link"] span',
-      '[data-testid="User-Name"] a[href^="/"]',
-      'a[href^="/"][tabindex="-1"]'
+    // Strategy 1: Find the first profile link in User-Name area (most reliable)
+    const userNameArea = tweetElement.querySelector('[data-testid="User-Name"]');
+    if (userNameArea) {
+      // Look for the @username link specifically
+      const links = userNameArea.querySelectorAll('a[href^="/"]');
+      for (const link of links) {
+        const href = link.getAttribute('href');
+        const username = this.extractUsernameFromHref(href);
+        if (username) return username;
+      }
+
+      // Fallback: parse @username from text content
+      const text = userNameArea.textContent || '';
+      const atMatch = text.match(/@([A-Za-z0-9_]{1,15})/);
+      if (atMatch && this.isValidUsername(atMatch[1])) {
+        return atMatch[1];
+      }
+    }
+
+    // Strategy 2: Find avatar link (usually links to profile)
+    const avatarLink = tweetElement.querySelector('a[href^="/"][role="link"] img[src*="profile_images"]');
+    if (avatarLink) {
+      const link = avatarLink.closest('a');
+      if (link) {
+        const username = this.extractUsernameFromHref(link.href || link.getAttribute('href'));
+        if (username) return username;
+      }
+    }
+
+    // Strategy 3: First link in tweet that goes to a profile
+    const allLinks = tweetElement.querySelectorAll('a[href^="/"]');
+    for (const link of allLinks) {
+      const href = link.getAttribute('href');
+      // Skip status links, hashtags, etc
+      if (href?.includes('/status/') || href?.includes('/hashtag/')) continue;
+      const username = this.extractUsernameFromHref(href);
+      if (username) return username;
+    }
+
+    // Strategy 4: Look for data attributes Twitter might use
+    const authorAttr = tweetElement.getAttribute('data-screen-name') ||
+                       tweetElement.querySelector('[data-screen-name]')?.getAttribute('data-screen-name');
+    if (authorAttr && this.isValidUsername(authorAttr)) {
+      return authorAttr;
+    }
+
+    console.log('[Flock] Could not extract tweet author');
+    return null;
+  },
+
+  // Get DM conversation partner username - multi-strategy
+  getDMPartner() {
+    // Strategy 1: Conversation header links
+    const headerSelectors = [
+      '[data-testid="DMDrawerHeader"] a[href^="/"]',
+      '[data-testid="DMConversationHeader"] a[href^="/"]',
+      '[data-testid="conversation-header"] a[href^="/"]',
+      '[data-testid="DM_Conversation_Avatar"]',
     ];
 
-    for (const selector of selectors) {
-      const el = tweetElement.querySelector(selector);
-      if (el) {
-        const link = el.closest('a');
-        if (link?.href) {
-          const match = link.href.match(/(?:twitter\.com|x\.com)\/([^\/\?]+)/);
-          if (match && match[1] && !['home', 'explore', 'search', 'notifications', 'messages', 'i'].includes(match[1])) {
-            return match[1];
+    for (const selector of headerSelectors) {
+      const elements = document.querySelectorAll(selector);
+      for (const el of elements) {
+        const link = el.closest('a') || el.querySelector('a') || el;
+        const href = link.href || link.getAttribute('href');
+        const username = this.extractUsernameFromHref(href);
+        if (username) return username;
+      }
+    }
+
+    // Strategy 2: Parse from URL if in a DM conversation
+    const urlMatch = window.location.pathname.match(/\/messages\/(\d+-\d+)/);
+    if (urlMatch) {
+      // Can't get username from conversation ID, try header text
+      const header = document.querySelector('[data-testid="DMDrawerHeader"], [data-testid="DMConversationHeader"]');
+      if (header) {
+        const links = header.querySelectorAll('a[href^="/"]');
+        for (const link of links) {
+          const href = link.getAttribute('href');
+          if (href && !href.includes('/messages')) {
+            const username = this.extractUsernameFromHref(href);
+            if (username) return username;
           }
         }
       }
     }
 
-    // Fallback: look for @username text
-    const usernameSpan = tweetElement.querySelector('[data-testid="User-Name"]');
-    if (usernameSpan) {
-      const text = usernameSpan.textContent;
-      const match = text.match(/@(\w+)/);
-      if (match) return match[1];
-    }
-
-    return null;
-  },
-
-  // Get DM conversation partner username - improved detection
-  getDMPartner() {
-    // Method 1: Check conversation header
-    const headerSelectors = [
-      '[data-testid="DMConversationHeader"] a[href^="/"]',
-      '[data-testid="conversation-header"] a[href^="/"]',
-      '[data-testid="DM_Conversation_Avatar"]'
-    ];
-
-    for (const selector of headerSelectors) {
-      const el = document.querySelector(selector);
-      if (el) {
-        const link = el.closest('a') || el.querySelector('a');
-        if (link?.href) {
-          const match = link.href.match(/(?:twitter\.com|x\.com)\/([^\/\?]+)/);
-          if (match && match[1]) return match[1];
-        }
-        // Check for href attribute directly
-        const href = el.getAttribute('href');
-        if (href?.startsWith('/')) {
-          const username = href.split('/')[1];
-          if (username && !['messages', 'i'].includes(username)) return username;
-        }
+    // Strategy 3: Look in the conversation area for the other person's avatar/name
+    const conversationArea = document.querySelector('[data-testid="DMConversation"], [data-testid="DmActivityViewport"]');
+    if (conversationArea) {
+      const profileLinks = conversationArea.querySelectorAll('a[href^="/"]:not([href*="/messages"])');
+      for (const link of profileLinks) {
+        const username = this.extractUsernameFromHref(link.getAttribute('href'));
+        if (username) return username;
       }
     }
 
-    // Method 2: Look for name in header area
-    const dmHeader = document.querySelector('[data-testid="DMConversationHeader"], [data-testid="conversation-header"]');
-    if (dmHeader) {
-      const links = dmHeader.querySelectorAll('a[href^="/"]');
-      for (const link of links) {
-        const href = link.getAttribute('href');
-        if (href && !href.includes('/messages')) {
-          const username = href.replace('/', '').split('/')[0];
-          if (username) return username;
-        }
-      }
-    }
-
+    console.log('[Flock] Could not detect DM partner');
     return null;
   },
 
   // Get username from profile being viewed
   getProfileUsername() {
     const path = window.location.pathname;
-    const match = path.match(/^\/([^\/]+)/);
-    if (match) {
-      const reserved = ['home', 'explore', 'notifications', 'messages', 'bookmarks', 'lists', 'i', 'settings', 'search', 'compose'];
-      if (!reserved.includes(match[1])) {
-        return match[1];
-      }
+    const match = path.match(/^\/([A-Za-z0-9_]{1,15})(?:\/|$)/);
+    if (match && this.isValidUsername(match[1])) {
+      return match[1];
     }
     return null;
   },
 
+  // Check if a button is in "active" state (already liked/retweeted)
+  isButtonActive(button) {
+    if (!button) return false;
+
+    // Check aria-label for state hints
+    const ariaLabel = button.getAttribute('aria-label')?.toLowerCase() || '';
+    if (ariaLabel.includes('unlike') || ariaLabel.includes('undo')) return true;
+
+    // Check for color change (pink/red for likes, green for retweets)
+    const svg = button.querySelector('svg');
+    if (svg) {
+      const color = window.getComputedStyle(svg).color;
+      // Pink/red indicates liked
+      if (color.includes('rgb(249, 24, 128)') || color.includes('rgb(244, 33, 46)')) return true;
+      // Green indicates retweeted
+      if (color.includes('rgb(0, 186, 124)')) return true;
+    }
+
+    // Check data attributes
+    if (button.getAttribute('data-testid')?.includes('unlike')) return true;
+
+    return false;
+  },
+
   async trackInteraction(type, username, description, extraMeta = {}) {
-    if (!username) return false;
+    if (!username || !this.isValidUsername(username)) {
+      console.log(`[Flock] Invalid username for ${type}: ${username}`);
+      return false;
+    }
 
     const contact = await getContact(username);
-    if (!contact) return false; // Only track for saved contacts
+    if (!contact) {
+      // Only track for saved contacts - privacy preserving
+      return false;
+    }
 
-    const key = `${type}-${username}-${Math.floor(Date.now() / 10000)}`; // 10s buckets
-    if (!this.debounce(key)) return false;
+    // Use a unique key for deduplication
+    const key = `${type}-${username}-${Math.floor(Date.now() / 10000)}`;
+    if (!this.debounce(key)) {
+      console.log(`[Flock] Debounced: ${type} for @${username}`);
+      return false;
+    }
 
     await logInteraction(username, type, description, {
       url: window.location.href,
@@ -1273,36 +1366,56 @@ const InteractionTracker = {
     return true;
   },
 
+  // Track like with state verification
   async trackLike(tweetElement) {
     const author = this.getTweetAuthor(tweetElement);
-    await this.trackInteraction('like', author, `Liked @${author}'s tweet`);
+    if (!author) return;
+
+    // Wait a moment for state to update, then verify it's now liked
+    setTimeout(async () => {
+      // Find the current state of the like button
+      const currentButton = tweetElement.querySelector('[data-testid="like"], [data-testid="unlike"]');
+      const isNowLiked = currentButton?.getAttribute('data-testid') === 'unlike' ||
+                         this.isButtonActive(currentButton);
+
+      if (isNowLiked) {
+        await this.trackInteraction('like', author, `Liked @${author}'s tweet`);
+      }
+    }, 400);
   },
 
   async trackRetweet(tweetElement) {
     const author = this.getTweetAuthor(tweetElement);
+    if (!author) return;
     await this.trackInteraction('retweet', author, `Retweeted @${author}`);
   },
 
   async trackReply(tweetElement) {
     const author = this.getTweetAuthor(tweetElement);
+    if (!author) return;
     await this.trackInteraction('reply', author, `Replied to @${author}`);
   },
 
   async trackQuote(tweetElement) {
     const author = this.getTweetAuthor(tweetElement);
+    if (!author) return;
     await this.trackInteraction('quote', author, `Quoted @${author}`);
+  },
+
+  async trackBookmark(tweetElement) {
+    const author = this.getTweetAuthor(tweetElement);
+    if (!author) return;
+    await this.trackInteraction('bookmark', author, `Bookmarked @${author}'s tweet`);
   },
 
   async trackDM() {
     const partner = this.getDMPartner();
-    if (!partner) {
-      console.log('[Flock] Could not detect DM partner');
-      return;
-    }
+    if (!partner) return;
     await this.trackInteraction('dm', partner, `DM to @${partner}`);
   },
 
   async trackFollow(username) {
+    if (!username) return;
     await this.trackInteraction('follow', username, `Followed @${username}`);
   },
 
@@ -1322,48 +1435,72 @@ const InteractionTracker = {
       url: window.location.href,
       auto: true
     });
-    // No toast for views - too noisy
     console.log(`[Flock] Tracked: Viewed @${username}'s profile`);
   },
 
   observeInteractions() {
+    // Use capturing phase to catch events early
     document.addEventListener('click', async (e) => {
-      // Track likes
-      const likeButton = e.target.closest('[data-testid="like"]');
+      const target = e.target;
+
+      // Track likes - detect click on like button
+      const likeButton = target.closest('[data-testid="like"]');
       if (likeButton) {
         const tweet = likeButton.closest('article');
-        setTimeout(() => this.trackLike(tweet), 300);
+        if (tweet) {
+          // Check if it's already liked (clicking to unlike)
+          if (!this.isButtonActive(likeButton)) {
+            this.trackLike(tweet);
+          }
+        }
+        return;
       }
 
-      // Track retweets
-      const retweetButton = e.target.closest('[data-testid="retweet"]');
+      // Track unlikes are ignored (we only track positive interactions)
+
+      // Track retweet button click (opens menu)
+      const retweetButton = target.closest('[data-testid="retweet"]');
       if (retweetButton) {
-        this.pendingRetweet = retweetButton.closest('article');
+        const tweet = retweetButton.closest('article');
+        if (tweet && !this.isButtonActive(retweetButton)) {
+          this.pendingRetweet = tweet;
+        }
+        return;
       }
 
-      // Retweet confirmation
-      const retweetConfirm = e.target.closest('[data-testid="retweetConfirm"]');
+      // Track retweet confirmation from dropdown
+      const retweetConfirm = target.closest('[data-testid="retweetConfirm"]');
       if (retweetConfirm && this.pendingRetweet) {
         setTimeout(() => {
           this.trackRetweet(this.pendingRetweet);
           this.pendingRetweet = null;
-        }, 300);
+        }, 400);
+        return;
       }
 
-      // Quote tweet option
-      const quoteOption = e.target.closest('[data-testid="Dropdown"] [role="menuitem"]');
-      if (quoteOption && quoteOption.textContent?.toLowerCase().includes('quote')) {
-        this.pendingQuote = this.pendingRetweet;
+      // Track quote tweet option from dropdown
+      const menuItem = target.closest('[role="menuitem"]');
+      if (menuItem && this.pendingRetweet) {
+        const text = menuItem.textContent?.toLowerCase() || '';
+        if (text.includes('quote')) {
+          this.pendingQuote = this.pendingRetweet;
+          this.pendingRetweet = null;
+        }
+        return;
       }
 
-      // Track replies
-      const replyButton = e.target.closest('[data-testid="reply"]');
+      // Track reply button click
+      const replyButton = target.closest('[data-testid="reply"]');
       if (replyButton) {
-        this.pendingReplyTo = replyButton.closest('article');
+        const tweet = replyButton.closest('article');
+        if (tweet) {
+          this.pendingReplyTo = tweet;
+        }
+        return;
       }
 
-      // Track when tweet is sent (reply or quote)
-      const tweetButton = e.target.closest('[data-testid="tweetButton"], [data-testid="tweetButtonInline"]');
+      // Track tweet send (for replies/quotes)
+      const tweetButton = target.closest('[data-testid="tweetButton"], [data-testid="tweetButtonInline"]');
       if (tweetButton) {
         setTimeout(() => {
           if (this.pendingReplyTo) {
@@ -1374,21 +1511,49 @@ const InteractionTracker = {
             this.trackQuote(this.pendingQuote);
             this.pendingQuote = null;
           }
-        }, 500);
+        }, 600);
+        return;
+      }
+
+      // Track bookmark button click
+      const bookmarkButton = target.closest('[data-testid="bookmark"]');
+      if (bookmarkButton) {
+        const tweet = bookmarkButton.closest('article');
+        if (tweet && !this.isButtonActive(bookmarkButton)) {
+          setTimeout(() => this.trackBookmark(tweet), 400);
+        }
+        return;
       }
 
       // Track DM sends
-      const dmSendButton = e.target.closest('[data-testid="dmComposerSendButton"]');
+      const dmSendButton = target.closest('[data-testid="dmComposerSendButton"]');
       if (dmSendButton) {
-        setTimeout(() => this.trackDM(), 300);
+        setTimeout(() => this.trackDM(), 400);
+        return;
       }
 
-      // Track follows
-      const followButton = e.target.closest('[data-testid$="-follow"]');
-      if (followButton && !followButton.getAttribute('data-testid')?.includes('unfollow')) {
-        const username = this.getProfileUsername();
-        if (username) {
-          setTimeout(() => this.trackFollow(username), 300);
+      // Track follows (on profile pages)
+      const followButton = target.closest('[data-testid$="-follow"]');
+      if (followButton) {
+        const testId = followButton.getAttribute('data-testid') || '';
+        // Only track follows, not unfollows
+        if (!testId.includes('unfollow')) {
+          const username = this.getProfileUsername();
+          if (username) {
+            setTimeout(() => this.trackFollow(username), 400);
+          }
+        }
+        return;
+      }
+    }, true);
+
+    // Also observe keyboard interactions (Enter key to send)
+    document.addEventListener('keydown', async (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        // Check if in DM composer
+        const dmInput = e.target.closest('[data-testid="dmComposerTextInput"]');
+        if (dmInput) {
+          setTimeout(() => this.trackDM(), 400);
         }
       }
     }, true);
@@ -1402,19 +1567,25 @@ const InteractionTracker = {
           lastTrackedProfile = username;
           this.trackProfileView();
         }
+      } else {
+        lastTrackedProfile = null;
       }
     };
 
-    // Check on navigation
-    const navObserver = new MutationObserver(() => {
-      checkProfileView();
+    // Observe URL changes for profile tracking
+    let lastUrl = window.location.href;
+    const urlObserver = new MutationObserver(() => {
+      if (window.location.href !== lastUrl) {
+        lastUrl = window.location.href;
+        setTimeout(checkProfileView, 500);
+      }
     });
-    navObserver.observe(document.body, { childList: true, subtree: true });
+    urlObserver.observe(document.body, { childList: true, subtree: true });
 
-    // Initial check
+    // Initial profile check
     setTimeout(checkProfileView, 1000);
 
-    console.log('[Flock] Interaction tracking enabled (likes, retweets, replies, quotes, DMs, follows, views)');
+    console.log('[Flock] Interaction tracking enabled (likes, retweets, replies, quotes, bookmarks, DMs, follows, profile views)');
   }
 };
 
