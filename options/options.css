@@ -309,3 +309,80 @@ body {
 .flock-toast.removing {
   animation: toast-out 0.2s ease-in forwards;
 }
+
+/* Vertical Option Layout */
+.flock-option-vertical {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.flock-option-vertical .flock-option-info {
+  margin-right: 0;
+}
+
+.flock-option-desc a {
+  color: var(--flock-amber);
+  text-decoration: none;
+}
+
+.flock-option-desc a:hover {
+  text-decoration: underline;
+}
+
+/* Input Group */
+.flock-input-group {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.flock-input {
+  flex: 1;
+  padding: 10px 14px;
+  background: var(--flock-bg-tertiary);
+  border: 1px solid var(--flock-border);
+  border-radius: var(--flock-radius-md);
+  color: var(--flock-text-primary);
+  font-family: var(--flock-font-mono);
+  font-size: 13px;
+  transition: all var(--flock-transition);
+}
+
+.flock-input:focus {
+  outline: none;
+  border-color: var(--flock-amber);
+  background: var(--flock-bg-elevated);
+}
+
+.flock-input::placeholder {
+  color: var(--flock-text-tertiary);
+}
+
+/* Primary Button */
+.flock-btn-primary {
+  background: var(--flock-amber);
+  color: #000000;
+}
+
+.flock-btn-primary:hover {
+  background: var(--flock-amber-hover);
+}
+
+/* API Status */
+.flock-api-status {
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+.flock-status-ok {
+  color: var(--flock-success);
+}
+
+.flock-status-none {
+  color: var(--flock-text-tertiary);
+}
+
+.flock-toast.info {
+  border-color: var(--flock-amber);
+}

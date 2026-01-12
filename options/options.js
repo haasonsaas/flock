@@ -277,6 +277,63 @@ async function updateStats() {
 }
 
 // ================================
+// API KEY MANAGEMENT
+// ================================
+
+async function loadApiKey() {
+  const result = await chrome.storage.sync.get('anthropicApiKey');
+  const apiKeyInput = document.getElementById('apiKeyInput');
+  const apiStatus = document.getElementById('apiStatus');
+
+  if (result.anthropicApiKey) {
+    // Mask the key, show first 7 and last 4 chars
+    const key = result.anthropicApiKey;
+    apiKeyInput.value = key.substring(0, 7) + '...' + key.substring(key.length - 4);
+    apiKeyInput.dataset.hasKey = 'true';
+    apiStatus.innerHTML = '<span class="flock-status-ok">✓ API key configured</span>';
+  } else {
+    apiKeyInput.value = '';
+    apiKeyInput.dataset.hasKey = 'false';
+    apiStatus.innerHTML = '<span class="flock-status-none">No API key set</span>';
+  }
+}
+
+async function saveApiKey() {
+  const apiKeyInput = document.getElementById('apiKeyInput');
+  const apiStatus = document.getElementById('apiStatus');
+  const key = apiKeyInput.value.trim();
+
+  // If the input shows a masked key and hasn't been changed, skip
+  if (key.includes('...') && apiKeyInput.dataset.hasKey === 'true') {
+    showToast('API key unchanged', 'info');
+    return;
+  }
+
+  // Validate key format
+  if (!key) {
+    await chrome.storage.sync.remove('anthropicApiKey');
+    apiStatus.innerHTML = '<span class="flock-status-none">API key removed</span>';
+    showToast('API key removed', 'success');
+    return;
+  }
+
+  if (!key.startsWith('sk-ant-')) {
+    showToast('Invalid API key format (should start with sk-ant-)', 'error');
+    return;
+  }
+
+  // Save the key
+  await chrome.storage.sync.set({ anthropicApiKey: key });
+
+  // Mask it in the UI
+  apiKeyInput.value = key.substring(0, 7) + '...' + key.substring(key.length - 4);
+  apiKeyInput.dataset.hasKey = 'true';
+  apiStatus.innerHTML = '<span class="flock-status-ok">✓ API key saved</span>';
+
+  showToast('API key saved!', 'success');
+}
+
+// ================================
 // INITIALIZATION
 // ================================
 
@@ -284,6 +341,7 @@ async function init() {
   try {
     await initDB();
     await updateStats();
+    await loadApiKey();
 
     // Event listeners
     document.getElementById('exportBtn').addEventListener('click', handleExport);
@@ -295,6 +353,20 @@ async function init() {
     });
 
     document.getElementById('clearBtn').addEventListener('click', handleClear);
+
+    // API key
+    document.getElementById('saveApiKeyBtn').addEventListener('click', saveApiKey);
+    document.getElementById('apiKeyInput').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') saveApiKey();
+    });
+
+    // Clear masked key on focus
+    document.getElementById('apiKeyInput').addEventListener('focus', (e) => {
+      if (e.target.dataset.hasKey === 'true' && e.target.value.includes('...')) {
+        e.target.value = '';
+        e.target.type = 'password';
+      }
+    });
 
   } catch (error) {
     console.error('[Flock] Options init error:', error);

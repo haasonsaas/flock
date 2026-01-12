@@ -19,6 +19,65 @@ const Icons = {
   success: `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none"/><path d="M8 12l3 3 5-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>`,
   // Flock logo for sidebar header
   logo: `<svg viewBox="0 0 24 24"><path d="M21.5 6.5c-.5.5-1.5 1-3 1.5.5 1.5.5 3 0 4.5-.5 1.5-1.5 3-3 4.5-1.5 1.5-3.5 2.5-6 3-2.5.5-5 .5-7.5-.5 2 0 3.5-.5 5-1.5-1.5 0-2.5-.5-3.5-1.5 1 0 2-.5 2.5-1-1.5-.5-2.5-1.5-3-2.5 1 .5 2 .5 2.5.5C4 12 3 10.5 3 8.5c.5.5 1.5.5 2 .5-1.5-1-2-2.5-2-4.5 0-.5 0-1 .5-1.5 2 2.5 4.5 4 8 4.5 0-.5-.5-1-.5-1.5 0-2 1.5-3.5 3.5-3.5 1 0 2 .5 2.5 1 1-.5 2-.5 2.5-1-.5 1-.5 2-1.5 2.5 1 0 2-.5 2.5-.5-.5 1-1 1.5-2 2z" fill="currentColor"/></svg>`,
+  // AI/Agent icons
+  sparkle: `<svg viewBox="0 0 24 24"><path d="M12 2L14 8L20 10L14 12L12 18L10 12L4 10L10 8L12 2Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" fill="none"/><path d="M19 15L20 17L22 18L20 19L19 21L18 19L16 18L18 17L19 15Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" fill="none"/></svg>`,
+  brain: `<svg viewBox="0 0 24 24"><path d="M12 4.5c-3 0-5 2-5 4.5 0 1.5.5 2.5 1 3.5.5 1 1 2 1 3v2a2 2 0 002 2h2a2 2 0 002-2v-2c0-1 .5-2 1-3s1-2 1-3.5c0-2.5-2-4.5-5-4.5z" stroke="currentColor" stroke-width="2" fill="none"/><path d="M9 17.5h6M9 15h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`,
+  lightning: `<svg viewBox="0 0 24 24"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" fill="none"/></svg>`,
+  briefcase: `<svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2" fill="none"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2" stroke="currentColor" stroke-width="2"/></svg>`,
+  link: `<svg viewBox="0 0 24 24"><path d="M10 14a5 5 0 007-7l-2-2a5 5 0 00-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/><path d="M14 10a5 5 0 00-7 7l2 2a5 5 0 007-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>`,
+  globe: `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none"/><path d="M2 12h20M12 2a15 15 0 010 20 15 15 0 010-20" stroke="currentColor" stroke-width="2" fill="none"/></svg>`,
+};
+
+// ================================
+// AI API (via background worker)
+// ================================
+const FlockAgent = {
+  available: null,
+
+  async checkAvailability() {
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage({ action: 'checkAiAvailable' }, (response) => {
+        this.available = response?.available || false;
+        resolve(this.available);
+      });
+    });
+  },
+
+  async enrichContact(contact) {
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage({ action: 'enrichContact', contact }, (response) => {
+        if (response?.success) {
+          resolve(response.data);
+        } else {
+          resolve({ error: response?.error || 'Failed to enrich contact' });
+        }
+      });
+    });
+  },
+
+  async generateBrief(contact, interactions = []) {
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage({ action: 'generateBrief', contact, interactions }, (response) => {
+        if (response?.success) {
+          resolve(response.data);
+        } else {
+          resolve({ error: response?.error || 'Failed to generate brief' });
+        }
+      });
+    });
+  },
+
+  async suggestFollowUp(contact, interactions = []) {
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage({ action: 'suggestFollowUp', contact, interactions }, (response) => {
+        if (response?.success) {
+          resolve(response.data);
+        } else {
+          resolve({ error: response?.error || 'Failed to get suggestions' });
+        }
+      });
+    });
+  }
 };
 
 // ================================
@@ -406,6 +465,10 @@ class FlockSidebar {
 
     const pipelineStages = ['new', 'contacted', 'engaged', 'qualified', 'won', 'lost'];
 
+    // Check if we have enriched data
+    const enriched = contact.enrichedData || {};
+    const hasEnrichedData = enriched.company || enriched.role || enriched.linkedin;
+
     content.innerHTML = `
       <div class="flock-profile-section flock-animate-in">
         <div class="flock-profile-header">
@@ -426,6 +489,93 @@ class FlockSidebar {
           <div class="flock-stat">
             <span class="flock-stat-value">${TwitterParser.formatCount(contact.followingCount)}</span>
             <span class="flock-stat-label">following</span>
+          </div>
+        </div>
+
+        <!-- AI Enrichment Section -->
+        <div class="flock-ai-section">
+          <div class="flock-section-header">
+            <div class="flock-section-label">
+              ${Icons.sparkle}
+              <span>AI Insights</span>
+            </div>
+            <button class="flock-enrich-btn ${hasEnrichedData ? 'flock-enriched' : ''}" data-action="enrich">
+              ${hasEnrichedData ? 'Refresh' : 'Enrich'}
+            </button>
+          </div>
+
+          ${hasEnrichedData ? `
+            <div class="flock-enriched-data">
+              ${enriched.company ? `
+                <div class="flock-enriched-item">
+                  ${Icons.briefcase}
+                  <div>
+                    <span class="flock-enriched-label">Company</span>
+                    <span class="flock-enriched-value">${enriched.company}</span>
+                  </div>
+                </div>
+              ` : ''}
+              ${enriched.role ? `
+                <div class="flock-enriched-item">
+                  ${Icons.brain}
+                  <div>
+                    <span class="flock-enriched-label">Role</span>
+                    <span class="flock-enriched-value">${enriched.role}</span>
+                  </div>
+                </div>
+              ` : ''}
+              ${enriched.industry ? `
+                <div class="flock-enriched-item">
+                  ${Icons.globe}
+                  <div>
+                    <span class="flock-enriched-label">Industry</span>
+                    <span class="flock-enriched-value">${enriched.industry}</span>
+                  </div>
+                </div>
+              ` : ''}
+              ${enriched.linkedin ? `
+                <div class="flock-enriched-item">
+                  ${Icons.link}
+                  <div>
+                    <span class="flock-enriched-label">LinkedIn</span>
+                    <a href="${enriched.linkedin}" target="_blank" class="flock-enriched-link">${enriched.linkedin.replace('https://www.linkedin.com/in/', '')}</a>
+                  </div>
+                </div>
+              ` : ''}
+              ${enriched.talkingPoints?.length ? `
+                <div class="flock-talking-points">
+                  <span class="flock-enriched-label">Talking Points</span>
+                  <ul>
+                    ${enriched.talkingPoints.map(p => `<li>${p}</li>`).join('')}
+                  </ul>
+                </div>
+              ` : ''}
+              <div class="flock-enriched-meta">
+                <span class="flock-confidence flock-confidence-${enriched.confidence || 'low'}">${enriched.confidence || 'low'} confidence</span>
+              </div>
+            </div>
+          ` : `
+            <div class="flock-enrich-prompt">
+              <p>Click "Enrich" to research this contact with AI and discover:</p>
+              <ul>
+                <li>Company & Role</li>
+                <li>LinkedIn Profile</li>
+                <li>Industry & Interests</li>
+                <li>Conversation Starters</li>
+              </ul>
+            </div>
+          `}
+
+          <!-- AI Actions -->
+          <div class="flock-ai-actions">
+            <button class="flock-ai-btn" data-action="brief">
+              ${Icons.note}
+              Meeting Brief
+            </button>
+            <button class="flock-ai-btn" data-action="followup">
+              ${Icons.lightning}
+              Follow-up Ideas
+            </button>
           </div>
         </div>
 
@@ -496,10 +646,96 @@ class FlockSidebar {
     `;
 
     // Event listeners
-    this.attachEventListeners(contact);
+    this.attachEventListeners(contact, interactions);
   }
 
-  attachEventListeners(contact) {
+  attachEventListeners(contact, interactions) {
+    // AI Enrich button
+    const enrichBtn = this.element.querySelector('.flock-enrich-btn');
+    if (enrichBtn) {
+      enrichBtn.addEventListener('click', async () => {
+        enrichBtn.disabled = true;
+        enrichBtn.innerHTML = `${Icons.spinner} Researching...`;
+        enrichBtn.classList.add('flock-loading');
+
+        try {
+          const enrichedData = await FlockAgent.enrichContact(contact);
+
+          if (enrichedData.error) {
+            showToast(enrichedData.error, 'error');
+            enrichBtn.innerHTML = 'Enrich';
+            enrichBtn.disabled = false;
+            enrichBtn.classList.remove('flock-loading');
+            return;
+          }
+
+          // Save enriched data to contact
+          await updateContact(contact.username, { enrichedData });
+          contact.enrichedData = enrichedData;
+
+          showToast('Contact enriched!', 'success');
+
+          // Re-render to show enriched data
+          this.renderContent(contact, interactions);
+        } catch (error) {
+          showToast(`Enrichment failed: ${error.message}`, 'error');
+          enrichBtn.innerHTML = 'Enrich';
+          enrichBtn.disabled = false;
+          enrichBtn.classList.remove('flock-loading');
+        }
+      });
+    }
+
+    // AI Brief button
+    const briefBtn = this.element.querySelector('[data-action="brief"]');
+    if (briefBtn) {
+      briefBtn.addEventListener('click', async () => {
+        briefBtn.disabled = true;
+        briefBtn.innerHTML = `${Icons.spinner} Generating...`;
+
+        try {
+          const result = await FlockAgent.generateBrief(contact, interactions);
+
+          if (result.error) {
+            showToast(result.error, 'error');
+          } else {
+            // Show brief in a modal
+            this.showBriefModal(result.brief);
+          }
+        } catch (error) {
+          showToast(`Brief failed: ${error.message}`, 'error');
+        }
+
+        briefBtn.innerHTML = `${Icons.note} Meeting Brief`;
+        briefBtn.disabled = false;
+      });
+    }
+
+    // AI Follow-up button
+    const followupBtn = this.element.querySelector('[data-action="followup"]');
+    if (followupBtn) {
+      followupBtn.addEventListener('click', async () => {
+        followupBtn.disabled = true;
+        followupBtn.innerHTML = `${Icons.spinner} Thinking...`;
+
+        try {
+          const result = await FlockAgent.suggestFollowUp(contact, interactions);
+
+          if (result.error) {
+            showToast(result.error, 'error');
+          } else {
+            // Show suggestions in a modal
+            this.showFollowUpModal(result);
+          }
+        } catch (error) {
+          showToast(`Follow-up failed: ${error.message}`, 'error');
+        }
+
+        followupBtn.innerHTML = `${Icons.lightning} Follow-up Ideas`;
+        followupBtn.disabled = false;
+      });
+    }
+
     // Pipeline stage selection
     this.element.querySelectorAll('.flock-pipeline-stage').forEach(btn => {
       btn.addEventListener('click', async () => {
@@ -584,6 +820,141 @@ class FlockSidebar {
   close() {
     this.isOpen = false;
     this.element?.classList.remove('flock-open');
+  }
+
+  showBriefModal(briefContent) {
+    this.closeModal();
+
+    const modal = document.createElement('div');
+    modal.className = 'flock-modal';
+    modal.innerHTML = `
+      <div class="flock-modal-backdrop"></div>
+      <div class="flock-modal-content">
+        <div class="flock-modal-header">
+          ${Icons.note}
+          <span>Meeting Brief</span>
+          <button class="flock-modal-close">${Icons.close}</button>
+        </div>
+        <div class="flock-modal-body flock-brief-content">
+          ${this.formatMarkdown(briefContent)}
+        </div>
+        <div class="flock-modal-footer">
+          <button class="flock-modal-btn flock-copy-btn">Copy to Clipboard</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // Close handlers
+    modal.querySelector('.flock-modal-backdrop').addEventListener('click', () => this.closeModal());
+    modal.querySelector('.flock-modal-close').addEventListener('click', () => this.closeModal());
+
+    // Copy handler
+    modal.querySelector('.flock-copy-btn').addEventListener('click', () => {
+      navigator.clipboard.writeText(briefContent);
+      showToast('Copied to clipboard', 'success');
+    });
+
+    // Escape key
+    const escHandler = (e) => {
+      if (e.key === 'Escape') {
+        this.closeModal();
+        document.removeEventListener('keydown', escHandler);
+      }
+    };
+    document.addEventListener('keydown', escHandler);
+  }
+
+  showFollowUpModal(suggestion) {
+    this.closeModal();
+
+    const modal = document.createElement('div');
+    modal.className = 'flock-modal';
+    modal.innerHTML = `
+      <div class="flock-modal-backdrop"></div>
+      <div class="flock-modal-content">
+        <div class="flock-modal-header">
+          ${Icons.lightning}
+          <span>Follow-up Suggestions</span>
+          <button class="flock-modal-close">${Icons.close}</button>
+        </div>
+        <div class="flock-modal-body">
+          <div class="flock-followup-urgency flock-urgency-${suggestion.urgency || 'medium'}">
+            Urgency: ${(suggestion.urgency || 'medium').toUpperCase()}
+          </div>
+
+          <div class="flock-followup-section">
+            <h4>Recommended Action</h4>
+            <p>${suggestion.suggestedAction || 'No suggestion'}</p>
+          </div>
+
+          <div class="flock-followup-section">
+            <h4>Channel</h4>
+            <span class="flock-followup-channel">${suggestion.channel || 'DM'}</span>
+          </div>
+
+          <div class="flock-followup-section">
+            <h4>Timing</h4>
+            <p>${suggestion.timing || 'Soon'}</p>
+          </div>
+
+          ${suggestion.messageIdeas?.length ? `
+            <div class="flock-followup-section">
+              <h4>Message Ideas</h4>
+              <ul class="flock-message-ideas">
+                ${suggestion.messageIdeas.map(idea => `<li>${idea}</li>`).join('')}
+              </ul>
+            </div>
+          ` : ''}
+
+          ${suggestion.reason ? `
+            <div class="flock-followup-section flock-followup-reason">
+              <h4>Why</h4>
+              <p>${suggestion.reason}</p>
+            </div>
+          ` : ''}
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // Close handlers
+    modal.querySelector('.flock-modal-backdrop').addEventListener('click', () => this.closeModal());
+    modal.querySelector('.flock-modal-close').addEventListener('click', () => this.closeModal());
+
+    // Escape key
+    const escHandler = (e) => {
+      if (e.key === 'Escape') {
+        this.closeModal();
+        document.removeEventListener('keydown', escHandler);
+      }
+    };
+    document.addEventListener('keydown', escHandler);
+  }
+
+  closeModal() {
+    const modal = document.querySelector('.flock-modal');
+    if (modal) modal.remove();
+  }
+
+  formatMarkdown(text) {
+    if (!text) return '';
+    // Basic markdown conversion
+    return text
+      .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+      .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+      .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+      .replace(/^\* (.+)$/gm, '<li>$1</li>')
+      .replace(/^- (.+)$/gm, '<li>$1</li>')
+      .replace(/^\d+\. (.+)$/gm, '<li>$1</li>')
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+      .replace(/\n\n/g, '</p><p>')
+      .replace(/\n/g, '<br>')
+      .replace(/^/, '<p>')
+      .replace(/$/, '</p>');
   }
 
   toggle(username) {

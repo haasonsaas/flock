@@ -23,6 +23,11 @@ A Chrome extension that turns Twitter/X into your personal CRM. Save profiles, t
 - **Export/Import** - Full JSON export and import for backup and portability
 - **No account required** - Works completely offline, no sign-up needed
 
+### AI-Powered Features (Optional)
+- **Contact Enrichment** - Research contacts automatically to find company, role, LinkedIn, and more
+- **Meeting Briefs** - Generate one-pagers before calls with talking points and background
+- **Follow-up Suggestions** - Get AI recommendations on when and how to follow up
+
 ## Installation
 
 ### From Source (Development)
@@ -43,13 +48,34 @@ A Chrome extension that turns Twitter/X into your personal CRM. Save profiles, t
    - Click "Save to Flock" to add them to your CRM
    - Click the extension icon to open the dashboard
 
+### AI Features Setup (Optional)
+
+To enable AI-powered features like contact enrichment and meeting briefs:
+
+1. **Get an Anthropic API key**
+   - Visit [console.anthropic.com](https://console.anthropic.com/)
+   - Create an account and generate an API key
+
+2. **Add your API key to Flock**
+   - Click the Flock extension icon
+   - Go to Settings (or right-click → Options)
+   - Paste your API key in the "AI Features" section
+   - Click "Save"
+
+3. **Use AI features**
+   - Open any saved contact's sidebar
+   - Click "Enrich" to research the contact
+   - Use "Meeting Brief" or "Follow-up Ideas" for AI assistance
+
+AI features are optional - the extension works fully without them. Your API key is stored securely in Chrome's sync storage.
+
 ## Project Structure
 
 ```
 flock/
 ├── manifest.json           # Chrome extension manifest (v3)
 ├── background/
-│   └── service-worker.js   # Background service worker
+│   └── service-worker.js   # Background service worker + AI API calls
 ├── content/
 │   ├── content.js          # Injected into Twitter pages
 │   └── content.css         # Styles for injected elements
@@ -58,7 +84,7 @@ flock/
 │   ├── popup.css           # Dashboard styles
 │   └── popup.js            # Dashboard logic
 ├── options/
-│   ├── options.html        # Settings page
+│   ├── options.html        # Settings page (includes API key config)
 │   ├── options.css         # Settings styles
 │   └── options.js          # Settings logic
 ├── lib/
@@ -94,6 +120,7 @@ Flock uses a **Premium Utility** aesthetic:
 
 ### Key Files
 - `content/content.js` - Main content script that injects UI into Twitter
+- `background/service-worker.js` - Background worker handling AI API calls
 - `lib/storage.js` - Database abstraction layer
 - `lib/twitter-parser.js` - Twitter DOM parsing utilities
 - `popup/popup.js` - Dashboard logic
@@ -106,9 +133,11 @@ Flock uses a **Premium Utility** aesthetic:
 
 ## Roadmap
 
-### Phase 2 (Planned)
+### Phase 2 (In Progress)
 - [ ] Automatic interaction tracking
-- [ ] Contact enrichment (email, company)
+- [x] Contact enrichment (company, role, LinkedIn)
+- [x] AI-powered meeting briefs
+- [x] Follow-up suggestions
 - [ ] Lead scoring
 - [ ] Cloud sync (optional)
 - [ ] Team collaboration
