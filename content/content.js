@@ -26,6 +26,14 @@ const Icons = {
   briefcase: `<svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2" fill="none"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2" stroke="currentColor" stroke-width="2"/></svg>`,
   link: `<svg viewBox="0 0 24 24"><path d="M10 14a5 5 0 007-7l-2-2a5 5 0 00-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/><path d="M14 10a5 5 0 00-7 7l2 2a5 5 0 007-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>`,
   globe: `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none"/><path d="M2 12h20M12 2a15 15 0 010 20 15 15 0 010-20" stroke="currentColor" stroke-width="2" fill="none"/></svg>`,
+  // Interaction icons
+  like: `<svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" stroke="currentColor" stroke-width="2" fill="none"/></svg>`,
+  retweet: `<svg viewBox="0 0 24 24"><path d="M17 1l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M3 11V9a4 4 0 014-4h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M7 23l-4-4 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M21 13v2a4 4 0 01-4 4H3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>`,
+  reply: `<svg viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>`,
+  quote: `<svg viewBox="0 0 24 24"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V21z" stroke="currentColor" stroke-width="2" fill="none"/><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v4z" stroke="currentColor" stroke-width="2" fill="none"/></svg>`,
+  follow: `<svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><circle cx="9" cy="7" r="4" stroke="currentColor" stroke-width="2" fill="none"/><path d="M19 8v6M22 11h-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>`,
+  view: `<svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="currentColor" stroke-width="2" fill="none"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2" fill="none"/></svg>`,
+  dm: `<svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" stroke="currentColor" stroke-width="2" fill="none"/><path d="M22 6l-10 7L2 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>`,
 };
 
 // ================================
@@ -1135,147 +1143,278 @@ function handleNavigation() {
 // ================================
 
 const InteractionTracker = {
-  lastTrackedAction: null,
+  trackedActions: new Map(), // Better debounce tracking
 
   // Debounce to prevent duplicate tracking
-  debounce(key, delay = 2000) {
+  debounce(key, delay = 3000) {
     const now = Date.now();
-    if (this.lastTrackedAction?.key === key && now - this.lastTrackedAction.time < delay) {
+    const lastTime = this.trackedActions.get(key);
+    if (lastTime && now - lastTime < delay) {
       return false;
     }
-    this.lastTrackedAction = { key, time: now };
+    this.trackedActions.set(key, now);
+    // Clean old entries
+    if (this.trackedActions.size > 100) {
+      const cutoff = now - 60000;
+      for (const [k, v] of this.trackedActions) {
+        if (v < cutoff) this.trackedActions.delete(k);
+      }
+    }
     return true;
   },
 
-  // Extract username from a tweet element
+  // Extract username from a tweet element - improved detection
   getTweetAuthor(tweetElement) {
-    const userLink = tweetElement.querySelector('a[href^="/"][role="link"]');
-    if (userLink) {
-      const match = userLink.href.match(/twitter\.com\/([^\/\?]+)|x\.com\/([^\/\?]+)/);
-      return match ? (match[1] || match[2]) : null;
+    if (!tweetElement) return null;
+
+    // Try multiple selectors for robustness
+    const selectors = [
+      'a[href^="/"][role="link"] span',
+      '[data-testid="User-Name"] a[href^="/"]',
+      'a[href^="/"][tabindex="-1"]'
+    ];
+
+    for (const selector of selectors) {
+      const el = tweetElement.querySelector(selector);
+      if (el) {
+        const link = el.closest('a');
+        if (link?.href) {
+          const match = link.href.match(/(?:twitter\.com|x\.com)\/([^\/\?]+)/);
+          if (match && match[1] && !['home', 'explore', 'search', 'notifications', 'messages', 'i'].includes(match[1])) {
+            return match[1];
+          }
+        }
+      }
+    }
+
+    // Fallback: look for @username text
+    const usernameSpan = tweetElement.querySelector('[data-testid="User-Name"]');
+    if (usernameSpan) {
+      const text = usernameSpan.textContent;
+      const match = text.match(/@(\w+)/);
+      if (match) return match[1];
+    }
+
+    return null;
+  },
+
+  // Get DM conversation partner username - improved detection
+  getDMPartner() {
+    // Method 1: Check conversation header
+    const headerSelectors = [
+      '[data-testid="DMConversationHeader"] a[href^="/"]',
+      '[data-testid="conversation-header"] a[href^="/"]',
+      '[data-testid="DM_Conversation_Avatar"]'
+    ];
+
+    for (const selector of headerSelectors) {
+      const el = document.querySelector(selector);
+      if (el) {
+        const link = el.closest('a') || el.querySelector('a');
+        if (link?.href) {
+          const match = link.href.match(/(?:twitter\.com|x\.com)\/([^\/\?]+)/);
+          if (match && match[1]) return match[1];
+        }
+        // Check for href attribute directly
+        const href = el.getAttribute('href');
+        if (href?.startsWith('/')) {
+          const username = href.split('/')[1];
+          if (username && !['messages', 'i'].includes(username)) return username;
+        }
+      }
+    }
+
+    // Method 2: Look for name in header area
+    const dmHeader = document.querySelector('[data-testid="DMConversationHeader"], [data-testid="conversation-header"]');
+    if (dmHeader) {
+      const links = dmHeader.querySelectorAll('a[href^="/"]');
+      for (const link of links) {
+        const href = link.getAttribute('href');
+        if (href && !href.includes('/messages')) {
+          const username = href.replace('/', '').split('/')[0];
+          if (username) return username;
+        }
+      }
+    }
+
+    return null;
+  },
+
+  // Get username from profile being viewed
+  getProfileUsername() {
+    const path = window.location.pathname;
+    const match = path.match(/^\/([^\/]+)/);
+    if (match) {
+      const reserved = ['home', 'explore', 'notifications', 'messages', 'bookmarks', 'lists', 'i', 'settings', 'search', 'compose'];
+      if (!reserved.includes(match[1])) {
+        return match[1];
+      }
     }
     return null;
   },
 
-  // Get DM conversation partner username
-  getDMPartner() {
-    // Check URL for DM conversation
-    const match = window.location.pathname.match(/\/messages\/(\d+)-(\d+)/);
-    if (match) {
-      // Try to get username from conversation header
-      const header = document.querySelector('[data-testid="conversation-header"]');
-      if (header) {
-        const usernameEl = header.querySelector('a[href^="/"]');
-        if (usernameEl) {
-          const href = usernameEl.getAttribute('href');
-          return href?.replace('/', '') || null;
-        }
-      }
-      // Fallback: look for username in the DM header
-      const nameLink = document.querySelector('[data-testid="DM_Conversation_Avatar"]')?.closest('div')?.querySelector('a[href^="/"]');
-      if (nameLink) {
-        return nameLink.getAttribute('href')?.replace('/', '') || null;
-      }
-    }
-    return null;
+  async trackInteraction(type, username, description, extraMeta = {}) {
+    if (!username) return false;
+
+    const contact = await getContact(username);
+    if (!contact) return false; // Only track for saved contacts
+
+    const key = `${type}-${username}-${Math.floor(Date.now() / 10000)}`; // 10s buckets
+    if (!this.debounce(key)) return false;
+
+    await logInteraction(username, type, description, {
+      url: window.location.href,
+      auto: true,
+      ...extraMeta
+    });
+
+    console.log(`[Flock] Tracked: ${type} → @${username}`);
+    showToast(`Tracked: ${description}`, 'success');
+    return true;
   },
 
   async trackLike(tweetElement) {
     const author = this.getTweetAuthor(tweetElement);
-    if (!author) return;
+    await this.trackInteraction('like', author, `Liked @${author}'s tweet`);
+  },
 
-    const contact = await getContact(author);
-    if (!contact) return; // Only track for saved contacts
-
-    const key = `like-${author}-${Date.now().toString().slice(0, -4)}`;
-    if (!this.debounce(key)) return;
-
-    await logInteraction(author, 'like', 'Liked a tweet', {
-      url: window.location.href,
-      auto: true
-    });
-
-    console.log(`[Flock] Auto-tracked: Liked tweet from @${author}`);
-    showToast(`Tracked: Liked @${author}'s tweet`, 'success');
+  async trackRetweet(tweetElement) {
+    const author = this.getTweetAuthor(tweetElement);
+    await this.trackInteraction('retweet', author, `Retweeted @${author}`);
   },
 
   async trackReply(tweetElement) {
     const author = this.getTweetAuthor(tweetElement);
-    if (!author) return;
+    await this.trackInteraction('reply', author, `Replied to @${author}`);
+  },
 
-    const contact = await getContact(author);
-    if (!contact) return;
-
-    const key = `reply-${author}-${Date.now().toString().slice(0, -4)}`;
-    if (!this.debounce(key)) return;
-
-    await logInteraction(author, 'reply', 'Replied to a tweet', {
-      url: window.location.href,
-      auto: true
-    });
-
-    console.log(`[Flock] Auto-tracked: Replied to @${author}`);
-    showToast(`Tracked: Replied to @${author}`, 'success');
+  async trackQuote(tweetElement) {
+    const author = this.getTweetAuthor(tweetElement);
+    await this.trackInteraction('quote', author, `Quoted @${author}`);
   },
 
   async trackDM() {
     const partner = this.getDMPartner();
-    if (!partner) return;
+    if (!partner) {
+      console.log('[Flock] Could not detect DM partner');
+      return;
+    }
+    await this.trackInteraction('dm', partner, `DM to @${partner}`);
+  },
 
-    const contact = await getContact(partner);
+  async trackFollow(username) {
+    await this.trackInteraction('follow', username, `Followed @${username}`);
+  },
+
+  async trackProfileView() {
+    const username = this.getProfileUsername();
+    if (!username) return;
+
+    const contact = await getContact(username);
     if (!contact) return;
 
-    const key = `dm-${partner}-${Date.now().toString().slice(0, -4)}`;
-    if (!this.debounce(key, 5000)) return; // 5s debounce for DMs
+    // Only track once per session per profile
+    const key = `view-${username}-session`;
+    if (this.trackedActions.has(key)) return;
+    this.trackedActions.set(key, Date.now());
 
-    await logInteraction(partner, 'dm', 'Sent a DM', {
+    await logInteraction(username, 'view', `Viewed profile`, {
       url: window.location.href,
       auto: true
     });
-
-    console.log(`[Flock] Auto-tracked: DM to @${partner}`);
-    showToast(`Tracked: DM to @${partner}`, 'success');
+    // No toast for views - too noisy
+    console.log(`[Flock] Tracked: Viewed @${username}'s profile`);
   },
 
   observeInteractions() {
-    // Track likes
     document.addEventListener('click', async (e) => {
+      // Track likes
       const likeButton = e.target.closest('[data-testid="like"]');
       if (likeButton) {
         const tweet = likeButton.closest('article');
-        if (tweet) {
-          // Small delay to let the like register
-          setTimeout(() => this.trackLike(tweet), 500);
-        }
+        setTimeout(() => this.trackLike(tweet), 300);
       }
 
-      // Track replies (when clicking reply button, then detecting send)
+      // Track retweets
+      const retweetButton = e.target.closest('[data-testid="retweet"]');
+      if (retweetButton) {
+        this.pendingRetweet = retweetButton.closest('article');
+      }
+
+      // Retweet confirmation
+      const retweetConfirm = e.target.closest('[data-testid="retweetConfirm"]');
+      if (retweetConfirm && this.pendingRetweet) {
+        setTimeout(() => {
+          this.trackRetweet(this.pendingRetweet);
+          this.pendingRetweet = null;
+        }, 300);
+      }
+
+      // Quote tweet option
+      const quoteOption = e.target.closest('[data-testid="Dropdown"] [role="menuitem"]');
+      if (quoteOption && quoteOption.textContent?.toLowerCase().includes('quote')) {
+        this.pendingQuote = this.pendingRetweet;
+      }
+
+      // Track replies
       const replyButton = e.target.closest('[data-testid="reply"]');
       if (replyButton) {
-        const tweet = replyButton.closest('article');
-        if (tweet) {
-          // Store the tweet we're replying to
-          this.pendingReplyTo = tweet;
-        }
+        this.pendingReplyTo = replyButton.closest('article');
       }
 
-      // Track when tweet is sent (could be a reply)
+      // Track when tweet is sent (reply or quote)
       const tweetButton = e.target.closest('[data-testid="tweetButton"], [data-testid="tweetButtonInline"]');
-      if (tweetButton && this.pendingReplyTo) {
+      if (tweetButton) {
         setTimeout(() => {
-          this.trackReply(this.pendingReplyTo);
-          this.pendingReplyTo = null;
-        }, 1000);
+          if (this.pendingReplyTo) {
+            this.trackReply(this.pendingReplyTo);
+            this.pendingReplyTo = null;
+          }
+          if (this.pendingQuote) {
+            this.trackQuote(this.pendingQuote);
+            this.pendingQuote = null;
+          }
+        }, 500);
       }
 
       // Track DM sends
       const dmSendButton = e.target.closest('[data-testid="dmComposerSendButton"]');
       if (dmSendButton) {
-        setTimeout(() => this.trackDM(), 500);
+        setTimeout(() => this.trackDM(), 300);
+      }
+
+      // Track follows
+      const followButton = e.target.closest('[data-testid$="-follow"]');
+      if (followButton && !followButton.getAttribute('data-testid')?.includes('unfollow')) {
+        const username = this.getProfileUsername();
+        if (username) {
+          setTimeout(() => this.trackFollow(username), 300);
+        }
       }
     }, true);
 
-    console.log('[Flock] Interaction tracking enabled');
+    // Track profile views when navigating
+    let lastTrackedProfile = null;
+    const checkProfileView = () => {
+      if (TwitterParser.isProfilePage()) {
+        const username = this.getProfileUsername();
+        if (username && username !== lastTrackedProfile) {
+          lastTrackedProfile = username;
+          this.trackProfileView();
+        }
+      }
+    };
+
+    // Check on navigation
+    const navObserver = new MutationObserver(() => {
+      checkProfileView();
+    });
+    navObserver.observe(document.body, { childList: true, subtree: true });
+
+    // Initial check
+    setTimeout(checkProfileView, 1000);
+
+    console.log('[Flock] Interaction tracking enabled (likes, retweets, replies, quotes, DMs, follows, views)');
   }
 };
 
@@ -1377,24 +1516,34 @@ const KeyboardShortcuts = {
 const DMTemplates = {
   defaultTemplates: [
     {
-      id: 'intro',
-      name: 'Introduction',
-      text: "Hey {name}! I came across your profile and really enjoyed your content about {topic}. Would love to connect!"
+      id: 'specific-praise',
+      name: 'Specific praise',
+      text: "Your thread on {topic} was one of the best breakdowns I've read. The part about {specific} clicked for me."
     },
     {
-      id: 'followup',
-      name: 'Follow-up',
-      text: "Hey {name}, just wanted to follow up on my previous message. Let me know if you'd be interested in chatting!"
+      id: 'quick-question',
+      name: 'Quick question',
+      text: "Hey {name} - quick q: {question}? No pressure if you're slammed."
     },
     {
-      id: 'collab',
-      name: 'Collaboration',
-      text: "Hey {name}! I've been following your work and think there might be a great opportunity to collaborate. Would you be open to a quick chat?"
+      id: 'share-resource',
+      name: 'Share something',
+      text: "Saw your post about {topic}. This might be useful: {link}"
     },
     {
-      id: 'congrats',
-      name: 'Congratulations',
-      text: "Hey {name}, just saw the news - congrats! 🎉 Really impressive stuff."
+      id: 'intro-mutual',
+      name: 'Mutual connection',
+      text: "Hey {name}, {mutual} mentioned you're working on {topic}. I'm building something similar - would be cool to swap notes."
+    },
+    {
+      id: 'offer-help',
+      name: 'Offer help',
+      text: "Noticed you're working on {topic}. I spent 2 years doing {related} - happy to share what worked (and what didn't) if helpful."
+    },
+    {
+      id: 'simple-follow',
+      name: 'Simple follow-up',
+      text: "Hey, circling back on this ^"
     }
   ],
 
@@ -1419,12 +1568,20 @@ const DMTemplates = {
   },
 
   fillPlaceholders(text, contact) {
+    // Highlight unfilled placeholders in brackets
     return text
-      .replace(/{name}/g, contact?.displayName?.split(' ')[0] || 'there')
-      .replace(/{fullname}/g, contact?.displayName || 'there')
-      .replace(/{username}/g, contact?.username || '')
+      .replace(/{name}/g, contact?.displayName?.split(' ')[0] || '[name]')
+      .replace(/{fullname}/g, contact?.displayName || '[name]')
+      .replace(/{username}/g, contact?.username ? `@${contact.username}` : '[username]')
+      .replace(/{company}/g, contact?.enrichedData?.company || '[company]')
+      .replace(/{role}/g, contact?.enrichedData?.role || '[role]')
+      // Keep these as placeholders for user to fill
       .replace(/{topic}/g, '[topic]')
-      .replace(/{company}/g, contact?.enrichedData?.company || '[company]');
+      .replace(/{specific}/g, '[specific thing]')
+      .replace(/{question}/g, '[your question]')
+      .replace(/{link}/g, '[link]')
+      .replace(/{mutual}/g, '[mutual connection]')
+      .replace(/{related}/g, '[related experience]');
   },
 
   showPicker(targetInput = null) {
