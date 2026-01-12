@@ -53,7 +53,8 @@
     <!-- Tabs -->
     <div class="flock-tabs">
       <button class="flock-tab flock-active" data-tab="all">All</button>
-      <button class="flock-tab" data-tab="activity">Activity</button>
+      <button class="flock-tab" data-tab="reminders">Reminders</button>
+      <button class="flock-tab" data-tab="lists">Lists</button>
       <button class="flock-tab" data-tab="pipeline">Pipeline</button>
     </div>
 
@@ -62,6 +63,10 @@
 
     <!-- Filter Bar -->
     <div class="flock-filter-bar" id="filterBar">
+      <select class="flock-filter-select" id="listFilter">
+        <option value="">All lists</option>
+        <!-- Lists will be populated dynamically -->
+      </select>
       <select class="flock-filter-select" id="stageFilter">
         <option value="">All stages</option>
         <option value="new">New</option>
@@ -76,6 +81,7 @@
         <option value="name">Name A-Z</option>
         <option value="followers">Most followers</option>
         <option value="interaction">Last interaction</option>
+        <option value="reminder">Upcoming reminder</option>
       </select>
     </div>
 
@@ -86,9 +92,14 @@
         <!-- Contacts will be rendered here -->
       </div>
 
-      <!-- Activity Feed -->
-      <div class="flock-activity-feed" id="activityFeed" style="display: none;">
-        <!-- Activity items will be rendered here -->
+      <!-- Reminders View -->
+      <div class="flock-reminders-view" id="remindersView" style="display: none;">
+        <!-- Reminders will be rendered here -->
+      </div>
+
+      <!-- Lists View -->
+      <div class="flock-lists-view" id="listsView" style="display: none;">
+        <!-- Lists will be rendered here -->
       </div>
 
       <!-- Pipeline View -->

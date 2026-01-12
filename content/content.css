@@ -1391,3 +1391,289 @@
     transform: translateX(-50%) translateY(0);
   }
 }
+
+/* ================================
+   TIMELINE INDICATORS
+   Visual markers for saved contacts
+   ================================ */
+
+/* Profile Page Indicator */
+.flock-timeline-indicator {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin-left: 12px;
+  cursor: pointer;
+  z-index: 10;
+}
+
+.flock-indicator-ring {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--ring-color) 0%, color-mix(in srgb, var(--ring-color) 60%, black) 100%);
+  padding: 3px;
+  animation: flock-ring-pulse 2s ease-in-out infinite;
+  box-shadow: 0 0 16px color-mix(in srgb, var(--ring-color) 40%, transparent);
+}
+
+.flock-indicator-inner {
+  width: 100%;
+  height: 100%;
+  background: rgb(0, 0, 0);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.flock-indicator-inner svg {
+  width: 18px;
+  height: 18px;
+  fill: var(--ring-color);
+}
+
+@keyframes flock-ring-pulse {
+  0%, 100% {
+    box-shadow: 0 0 8px color-mix(in srgb, var(--ring-color) 30%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 20px color-mix(in srgb, var(--ring-color) 50%, transparent);
+  }
+}
+
+/* Tooltip on hover */
+.flock-indicator-tooltip {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) scale(0.95);
+  width: 240px;
+  background: rgb(22, 24, 28);
+  border: 1px solid rgb(47, 51, 54);
+  border-radius: 14px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  padding: 14px;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: all 150ms ease;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  z-index: 10001;
+}
+
+.flock-timeline-indicator:hover .flock-indicator-tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) scale(1);
+  pointer-events: auto;
+}
+
+.flock-indicator-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.flock-indicator-badge {
+  display: inline-flex;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 700;
+  color: white;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.flock-indicator-reminder {
+  display: inline-flex;
+  padding: 4px 8px;
+  background: rgba(245, 158, 11, 0.15);
+  border-radius: 9999px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #F59E0B;
+}
+
+.flock-indicator-overdue {
+  display: inline-flex;
+  padding: 4px 8px;
+  background: rgba(239, 68, 68, 0.15);
+  border-radius: 9999px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #EF4444;
+  animation: flock-blink 1.5s ease-in-out infinite;
+}
+
+@keyframes flock-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.flock-indicator-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.flock-indicator-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.flock-indicator-stat-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: rgb(231, 233, 234);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.flock-indicator-stat-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: rgb(113, 118, 123);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.flock-indicator-stage {
+  padding: 8px 12px;
+  background: rgb(39, 44, 48);
+  border-radius: 8px;
+  font-size: 12px;
+  color: rgb(113, 118, 123);
+  margin-bottom: 10px;
+}
+
+.flock-indicator-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.flock-indicator-tag {
+  display: inline-flex;
+  padding: 3px 8px;
+  background: rgb(39, 44, 48);
+  border-radius: 9999px;
+  font-size: 11px;
+  color: rgb(231, 233, 234);
+}
+
+.flock-indicator-more {
+  display: inline-flex;
+  padding: 3px 8px;
+  background: rgba(245, 158, 11, 0.15);
+  border-radius: 9999px;
+  font-size: 11px;
+  color: #F59E0B;
+}
+
+.flock-indicator-action {
+  text-align: center;
+  padding-top: 10px;
+  border-top: 1px solid rgb(47, 51, 54);
+  font-size: 11px;
+  font-weight: 600;
+  color: #F59E0B;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Avatar Ring for Timeline/Feed */
+.flock-avatar-ring {
+  position: absolute;
+  top: -3px;
+  left: -3px;
+  right: -3px;
+  bottom: -3px;
+  border-radius: 50%;
+  border: 2.5px solid var(--ring-color);
+  pointer-events: none;
+  animation: flock-avatar-glow 2.5s ease-in-out infinite;
+}
+
+@keyframes flock-avatar-glow {
+  0%, 100% {
+    box-shadow: 0 0 6px color-mix(in srgb, var(--ring-color) 40%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 12px color-mix(in srgb, var(--ring-color) 60%, transparent);
+  }
+}
+
+.flock-avatar-ring.flock-has-reminder::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 10px;
+  height: 10px;
+  background: #F59E0B;
+  border-radius: 50%;
+  border: 2px solid rgb(0, 0, 0);
+  animation: flock-reminder-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes flock-reminder-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 0.8;
+  }
+}
+
+/* User Badge for follower/following lists */
+.flock-user-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-left: 6px;
+  border-radius: 4px;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(245, 158, 11, 0.1) 100%);
+  vertical-align: middle;
+}
+
+.flock-user-badge svg {
+  width: 12px;
+  height: 12px;
+  fill: #F59E0B;
+}
+
+/* Indicator on profile photo hover */
+.flock-profile-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.7) 0%, transparent 50%);
+  border-radius: 50%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 10%;
+  opacity: 0;
+  transition: opacity 200ms;
+  pointer-events: none;
+}
+
+.flock-profile-photo-wrap:hover .flock-profile-overlay {
+  opacity: 1;
+}
+
+.flock-profile-overlay svg {
+  width: 24px;
+  height: 24px;
+  fill: #F59E0B;
+}

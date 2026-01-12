@@ -1915,6 +1915,323 @@ const DMTemplates = {
 };
 
 // ================================
+// TIMELINE INDICATORS
+// ================================
+
+const TimelineIndicators = {
+  // Cache for contact lookups to avoid repeated storage calls
+  contactCache: new Map(),
+  cacheExpiry: 30000, // 30 seconds
+
+  // Relationship strength thresholds
+  STRENGTH_LEVELS: {
+    hot: { min: 10, color: '#f43f5e', label: 'Hot' },      // 10+ interactions
+    warm: { min: 5, color: '#f97316', label: 'Warm' },     // 5-9 interactions
+    engaged: { min: 2, color: '#eab308', label: 'Engaged' }, // 2-4 interactions
+    new: { min: 0, color: '#22c55e', label: 'New' }        // 0-1 interactions
+  },
+
+  async getCachedContact(username) {
+    const cached = this.contactCache.get(username);
+    if (cached && Date.now() - cached.timestamp < this.cacheExpiry) {
+      return cached.contact;
+    }
+
+    const contact = await getContact(username);
+    this.contactCache.set(username, { contact, timestamp: Date.now() });
+    return contact;
+  },
+
+  async getInteractionCount(username) {
+    const interactions = await getInteractionsForContact(username);
+    return interactions.length;
+  },
+
+  getStrengthLevel(interactionCount) {
+    if (interactionCount >= this.STRENGTH_LEVELS.hot.min) return this.STRENGTH_LEVELS.hot;
+    if (interactionCount >= this.STRENGTH_LEVELS.warm.min) return this.STRENGTH_LEVELS.warm;
+    if (interactionCount >= this.STRENGTH_LEVELS.engaged.min) return this.STRENGTH_LEVELS.engaged;
+    return this.STRENGTH_LEVELS.new;
+  },
+
+  formatLastInteraction(timestamp) {
+    if (!timestamp) return 'No interactions yet';
+    const diff = Date.now() - timestamp;
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    if (days === 0) return 'Today';
+    if (days === 1) return 'Yesterday';
+    if (days < 7) return `${days} days ago`;
+    if (days < 30) return `${Math.floor(days / 7)} weeks ago`;
+    if (days < 365) return `${Math.floor(days / 30)} months ago`;
+    return `${Math.floor(days / 365)} years ago`;
+  },
+
+  hasUpcomingReminder(contact) {
+    if (!contact.reminder?.date) return false;
+    const reminderDate = contact.reminder.date;
+    const now = Date.now();
+    const threeDays = 3 * 24 * 60 * 60 * 1000;
+    return reminderDate > now && reminderDate - now < threeDays;
+  },
+
+  isOverdue(contact) {
+    if (!contact.reminder?.date) return false;
+    return contact.reminder.date < Date.now();
+  },
+
+  // Create the indicator badge for profile pages
+  createProfileIndicator(contact, interactionCount) {
+    const strength = this.getStrengthLevel(interactionCount);
+    const hasReminder = this.hasUpcomingReminder(contact);
+    const isOverdue = this.isOverdue(contact);
+
+    const indicator = document.createElement('div');
+    indicator.className = 'flock-timeline-indicator';
+    indicator.innerHTML = `
+      <div class="flock-indicator-ring" style="--ring-color: ${strength.color}">
+        <div class="flock-indicator-inner">
+          ${Icons.logo}
+        </div>
+      </div>
+      <div class="flock-indicator-tooltip">
+        <div class="flock-indicator-header">
+          <span class="flock-indicator-badge" style="background: ${strength.color}">${strength.label}</span>
+          ${hasReminder ? '<span class="flock-indicator-reminder">Reminder Soon</span>' : ''}
+          ${isOverdue ? '<span class="flock-indicator-overdue">Overdue!</span>' : ''}
+        </div>
+        <div class="flock-indicator-stats">
+          <div class="flock-indicator-stat">
+            <span class="flock-indicator-stat-value">${interactionCount}</span>
+            <span class="flock-indicator-stat-label">interactions</span>
+          </div>
+          <div class="flock-indicator-stat">
+            <span class="flock-indicator-stat-value">${this.formatLastInteraction(contact.lastInteraction)}</span>
+            <span class="flock-indicator-stat-label">last contact</span>
+          </div>
+        </div>
+        ${contact.pipelineStage ? `<div class="flock-indicator-stage">Pipeline: ${contact.pipelineStage}</div>` : ''}
+        ${contact.tags?.length ? `
+          <div class="flock-indicator-tags">
+            ${contact.tags.slice(0, 3).map(tag => `<span class="flock-indicator-tag">${tag}</span>`).join('')}
+            ${contact.tags.length > 3 ? `<span class="flock-indicator-more">+${contact.tags.length - 3}</span>` : ''}
+          </div>
+        ` : ''}
+        <div class="flock-indicator-action">Click to open Flock</div>
+      </div>
+    `;
+
+    indicator.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      sidebar.open(contact.username);
+    });
+
+    return indicator;
+  },
+
+  // Create mini indicator for avatars in timeline/feed
+  createAvatarRing(contact, interactionCount) {
+    const strength = this.getStrengthLevel(interactionCount);
+    const hasReminder = this.hasUpcomingReminder(contact) || this.isOverdue(contact);
+
+    const ring = document.createElement('div');
+    ring.className = 'flock-avatar-ring';
+    ring.style.setProperty('--ring-color', strength.color);
+
+    if (hasReminder) {
+      ring.classList.add('flock-has-reminder');
+    }
+
+    ring.title = `Flock: ${strength.label} (${interactionCount} interactions)`;
+
+    return ring;
+  },
+
+  // Inject indicator on profile page
+  async injectProfileIndicator() {
+    if (!TwitterParser.isProfilePage()) return;
+
+    // Don't inject if already present
+    if (document.querySelector('.flock-timeline-indicator')) return;
+
+    const username = TwitterParser.getCurrentUsername();
+    if (!username) return;
+
+    const contact = await this.getCachedContact(username);
+    if (!contact) return; // Not a saved contact
+
+    const interactionCount = await this.getInteractionCount(username);
+
+    // Find the profile header area
+    const profileHeader = document.querySelector('[data-testid="UserName"]');
+    if (!profileHeader) {
+      setTimeout(() => this.injectProfileIndicator(), 500);
+      return;
+    }
+
+    // Find a good anchor point - near the profile name
+    const nameContainer = profileHeader.closest('div[class]');
+    if (!nameContainer) return;
+
+    const indicator = this.createProfileIndicator(contact, interactionCount);
+
+    // Insert after the name container
+    const parent = nameContainer.parentElement;
+    if (parent && !parent.querySelector('.flock-timeline-indicator')) {
+      parent.insertBefore(indicator, nameContainer.nextSibling);
+    }
+  },
+
+  // Add rings to avatars in the timeline/feed
+  async decorateTimelineAvatars() {
+    // Find all tweet articles
+    const tweets = document.querySelectorAll('article[data-testid="tweet"]');
+
+    for (const tweet of tweets) {
+      // Skip if already processed
+      if (tweet.dataset.flockProcessed) continue;
+      tweet.dataset.flockProcessed = 'true';
+
+      // Get tweet author
+      const author = InteractionTracker.getTweetAuthor(tweet);
+      if (!author) continue;
+
+      const contact = await this.getCachedContact(author);
+      if (!contact) continue; // Not a saved contact
+
+      // Find the avatar
+      const avatar = tweet.querySelector('a[href^="/"] img[src*="profile_images"]');
+      if (!avatar) continue;
+
+      const avatarContainer = avatar.closest('a');
+      if (!avatarContainer || avatarContainer.querySelector('.flock-avatar-ring')) continue;
+
+      const interactionCount = await this.getInteractionCount(author);
+      const ring = this.createAvatarRing(contact, interactionCount);
+
+      // Position the ring around the avatar
+      avatarContainer.style.position = 'relative';
+      avatarContainer.appendChild(ring);
+    }
+  },
+
+  // Add indicator to user cells (like in followers/following lists)
+  async decorateUserCells() {
+    const userCells = document.querySelectorAll('[data-testid="UserCell"]');
+
+    for (const cell of userCells) {
+      if (cell.dataset.flockProcessed) continue;
+      cell.dataset.flockProcessed = 'true';
+
+      // Find username link
+      const links = cell.querySelectorAll('a[href^="/"]');
+      let username = null;
+
+      for (const link of links) {
+        const href = link.getAttribute('href');
+        const match = href?.match(/^\/([A-Za-z0-9_]{1,15})$/);
+        if (match && InteractionTracker.isValidUsername(match[1])) {
+          username = match[1];
+          break;
+        }
+      }
+
+      if (!username) continue;
+
+      const contact = await this.getCachedContact(username);
+      if (!contact) continue;
+
+      // Add a small Flock badge
+      const badge = document.createElement('span');
+      badge.className = 'flock-user-badge';
+      badge.innerHTML = Icons.logo;
+      badge.title = `In Flock: ${contact.pipelineStage || 'New'}`;
+
+      const nameArea = cell.querySelector('[dir="ltr"]');
+      if (nameArea && !nameArea.querySelector('.flock-user-badge')) {
+        nameArea.appendChild(badge);
+      }
+    }
+  },
+
+  // Start observing for new content
+  startObserving() {
+    // Inject on profile pages
+    this.injectProfileIndicator();
+
+    // Decorate existing timeline content
+    this.decorateTimelineAvatars();
+    this.decorateUserCells();
+
+    // Observe for new content being added to the page
+    const observer = new MutationObserver((mutations) => {
+      let shouldDecorate = false;
+
+      for (const mutation of mutations) {
+        if (mutation.addedNodes.length > 0) {
+          shouldDecorate = true;
+          break;
+        }
+      }
+
+      if (shouldDecorate) {
+        // Debounce the decoration
+        clearTimeout(this.decorateTimeout);
+        this.decorateTimeout = setTimeout(() => {
+          this.decorateTimelineAvatars();
+          this.decorateUserCells();
+
+          // Re-check profile indicator on navigation
+          if (TwitterParser.isProfilePage()) {
+            this.injectProfileIndicator();
+          }
+        }, 200);
+      }
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+
+    // Handle navigation changes
+    let lastUrl = window.location.href;
+    setInterval(() => {
+      if (window.location.href !== lastUrl) {
+        lastUrl = window.location.href;
+        // Clear processed flags on navigation
+        document.querySelectorAll('[data-flock-processed]').forEach(el => {
+          delete el.dataset.flockProcessed;
+        });
+        // Remove old indicators
+        document.querySelectorAll('.flock-timeline-indicator').forEach(el => el.remove());
+
+        // Re-inject after navigation
+        setTimeout(() => {
+          this.injectProfileIndicator();
+          this.decorateTimelineAvatars();
+          this.decorateUserCells();
+        }, 500);
+      }
+    }, 500);
+
+    console.log('[Flock] Timeline indicators enabled');
+  },
+
+  // Clear cache periodically
+  startCacheCleaner() {
+    setInterval(() => {
+      const now = Date.now();
+      for (const [key, value] of this.contactCache) {
+        if (now - value.timestamp > this.cacheExpiry) {
+          this.contactCache.delete(key);
+        }
+      }
+    }, 60000); // Clean every minute
+  }
+};
+
+// ================================
 // INITIALIZATION
 // ================================
 
@@ -1940,6 +2257,10 @@ async function init() {
         DMTemplates.injectTemplateButton();
       }
     }, 1000);
+
+    // Enable timeline indicators for saved contacts
+    TimelineIndicators.startObserving();
+    TimelineIndicators.startCacheCleaner();
 
     console.log('[Flock] Ready');
   } catch (error) {
