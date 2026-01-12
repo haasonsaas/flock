@@ -5,7 +5,9 @@
   "description": "Your personal CRM for Twitter. Save profiles, track interactions, manage your pipeline.",
   "permissions": [
     "storage",
-    "activeTab"
+    "activeTab",
+    "notifications",
+    "alarms"
   ],
   "options_ui": {
     "page": "options/options.html",

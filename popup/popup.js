@@ -35,16 +35,119 @@ async function getAllInteractions() {
   return result.interactions || {};
 }
 
+// Saved search filters
+let savedFilters = [];
+
+async function loadSavedFilters() {
+  const result = await chrome.storage.local.get('savedFilters');
+  savedFilters = result.savedFilters || [];
+  return savedFilters;
+}
+
+async function saveFilter(name, query) {
+  savedFilters.push({ id: Date.now().toString(), name, query, createdAt: Date.now() });
+  await chrome.storage.local.set({ savedFilters });
+  return savedFilters;
+}
+
+async function deleteFilter(id) {
+  savedFilters = savedFilters.filter(f => f.id !== id);
+  await chrome.storage.local.set({ savedFilters });
+  return savedFilters;
+}
+
+// Advanced search with syntax support
+// Supports: tag:name, stage:name, list:name, has:reminder, has:notes, @username
 async function searchContacts(query) {
   const all = await getAllContacts();
-  const q = query.toLowerCase();
-  return all.filter(c =>
-    c.username?.toLowerCase().includes(q) ||
-    c.displayName?.toLowerCase().includes(q) ||
-    c.bio?.toLowerCase().includes(q) ||
-    c.notes?.toLowerCase().includes(q) ||
-    c.tags?.some(t => t.toLowerCase().includes(q))
-  );
+  const lists = await getAllLists();
+
+  // Parse special syntax
+  const filters = {
+    tags: [],
+    stages: [],
+    lists: [],
+    hasReminder: false,
+    hasNotes: false,
+    text: []
+  };
+
+  const tokens = query.match(/(?:[^\s"]+|"[^"]*")+/g) || [];
+
+  tokens.forEach(token => {
+    const lower = token.toLowerCase();
+
+    if (lower.startsWith('tag:')) {
+      filters.tags.push(lower.slice(4).replace(/"/g, ''));
+    } else if (lower.startsWith('stage:')) {
+      filters.stages.push(lower.slice(6).replace(/"/g, ''));
+    } else if (lower.startsWith('list:')) {
+      const listName = lower.slice(5).replace(/"/g, '');
+      const list = lists.find(l => l.name.toLowerCase() === listName || l.id === listName);
+      if (list) filters.lists.push(list.id);
+    } else if (lower === 'has:reminder') {
+      filters.hasReminder = true;
+    } else if (lower === 'has:notes') {
+      filters.hasNotes = true;
+    } else if (lower.startsWith('@')) {
+      filters.text.push(lower.slice(1));
+    } else {
+      filters.text.push(lower.replace(/"/g, ''));
+    }
+  });
+
+  return all.filter(contact => {
+    // Check tag filters
+    if (filters.tags.length > 0) {
+      const contactTags = (contact.tags || []).map(t => t.toLowerCase());
+      if (!filters.tags.some(t => contactTags.some(ct => ct.includes(t)))) {
+        return false;
+      }
+    }
+
+    // Check stage filters
+    if (filters.stages.length > 0) {
+      const contactStage = (contact.pipelineStage || 'new').toLowerCase();
+      if (!filters.stages.some(s => contactStage.includes(s))) {
+        return false;
+      }
+    }
+
+    // Check list filters
+    if (filters.lists.length > 0) {
+      const contactLists = contact.listIds || [];
+      if (!filters.lists.some(l => contactLists.includes(l))) {
+        return false;
+      }
+    }
+
+    // Check has:reminder
+    if (filters.hasReminder && !contact.reminder?.date) {
+      return false;
+    }
+
+    // Check has:notes
+    if (filters.hasNotes && !contact.notes?.trim()) {
+      return false;
+    }
+
+    // Check text search
+    if (filters.text.length > 0) {
+      const searchableText = [
+        contact.username,
+        contact.displayName,
+        contact.bio,
+        contact.notes,
+        ...(contact.tags || [])
+      ].filter(Boolean).join(' ').toLowerCase();
+
+      if (!filters.text.every(t => searchableText.includes(t))) {
+        return false;
+      }
+    }
+
+    return true;
+  });
 }
 
 async function exportData() {
@@ -298,7 +401,13 @@ function renderContactCard(contact, interactions = {}) {
   const strengthClass = strength >= 60 ? 'strong' : strength >= 30 ? 'medium' : 'weak';
 
   return `
-    <div class="flock-contact-card" data-username="${escapeHtml(contact.username)}">
+    <div class="flock-contact-card ${bulkSelectMode ? 'flock-bulk-mode' : ''} ${selectedContacts.has(contact.username) ? 'flock-selected' : ''}" data-username="${escapeHtml(contact.username)}">
+      ${bulkSelectMode ? `
+        <label class="flock-bulk-checkbox-wrap">
+          <input type="checkbox" class="flock-bulk-checkbox" ${selectedContacts.has(contact.username) ? 'checked' : ''}>
+          <span class="flock-checkbox-custom"></span>
+        </label>
+      ` : ''}
       <div class="flock-avatar-wrap">
         <img
           class="flock-contact-avatar"
@@ -977,6 +1086,627 @@ function renderPipelineView(contacts) {
   });
 }
 
+// ================================
+// ANALYTICS VIEW
+// ================================
+
+async function renderAnalyticsView() {
+  const container = document.getElementById('analyticsView');
+  const contacts = allContacts;
+  const interactions = allInteractions;
+
+  // Calculate metrics
+  const metrics = calculateAnalyticsMetrics(contacts, interactions);
+
+  container.innerHTML = `
+    <div class="flock-analytics-grid">
+      <!-- Relationship Health Overview -->
+      <div class="flock-analytics-card flock-analytics-health">
+        <h3 class="flock-analytics-title">Relationship Health</h3>
+        <div class="flock-health-meter">
+          <div class="flock-health-bar" style="width: ${metrics.overallHealth}%"></div>
+        </div>
+        <div class="flock-health-score">${metrics.overallHealth}%</div>
+        <div class="flock-health-breakdown">
+          <div class="flock-health-segment flock-health-strong">
+            <span class="flock-segment-count">${metrics.healthBreakdown.strong}</span>
+            <span class="flock-segment-label">Strong</span>
+          </div>
+          <div class="flock-health-segment flock-health-medium">
+            <span class="flock-segment-count">${metrics.healthBreakdown.medium}</span>
+            <span class="flock-segment-label">Medium</span>
+          </div>
+          <div class="flock-health-segment flock-health-weak">
+            <span class="flock-segment-count">${metrics.healthBreakdown.weak}</span>
+            <span class="flock-segment-label">Weak</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Growth Trend -->
+      <div class="flock-analytics-card flock-analytics-growth">
+        <h3 class="flock-analytics-title">Growth (30 days)</h3>
+        <div class="flock-growth-chart">
+          ${renderGrowthChart(metrics.growthData)}
+        </div>
+        <div class="flock-growth-stats">
+          <div class="flock-growth-stat">
+            <span class="flock-growth-value ${metrics.growthTrend >= 0 ? 'positive' : 'negative'}">
+              ${metrics.growthTrend >= 0 ? '+' : ''}${metrics.growthTrend}
+            </span>
+            <span class="flock-growth-label">contacts this month</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stage Distribution -->
+      <div class="flock-analytics-card flock-analytics-stages">
+        <h3 class="flock-analytics-title">Pipeline Distribution</h3>
+        <div class="flock-stage-bars">
+          ${Object.entries(metrics.stageDistribution).map(([stage, count]) => `
+            <div class="flock-stage-bar-row">
+              <span class="flock-stage-bar-label">${stage}</span>
+              <div class="flock-stage-bar-track">
+                <div class="flock-stage-bar-fill stage-${stage}" style="width: ${contacts.length > 0 ? (count / contacts.length * 100) : 0}%"></div>
+              </div>
+              <span class="flock-stage-bar-value">${count}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+
+      <!-- Activity Heatmap (Last 7 days) -->
+      <div class="flock-analytics-card flock-analytics-activity">
+        <h3 class="flock-analytics-title">Recent Activity</h3>
+        <div class="flock-activity-heatmap">
+          ${metrics.activityByDay.map(day => `
+            <div class="flock-activity-day">
+              <div class="flock-activity-cell ${getActivityLevel(day.count)}" title="${day.name}: ${day.count} interactions"></div>
+              <span class="flock-activity-label">${day.shortName}</span>
+            </div>
+          `).join('')}
+        </div>
+        <div class="flock-activity-legend">
+          <span>Less</span>
+          <div class="flock-legend-cells">
+            <div class="flock-activity-cell activity-none"></div>
+            <div class="flock-activity-cell activity-low"></div>
+            <div class="flock-activity-cell activity-medium"></div>
+            <div class="flock-activity-cell activity-high"></div>
+          </div>
+          <span>More</span>
+        </div>
+      </div>
+
+      <!-- Top Tags -->
+      <div class="flock-analytics-card flock-analytics-tags">
+        <h3 class="flock-analytics-title">Popular Tags</h3>
+        <div class="flock-top-tags">
+          ${metrics.topTags.length > 0 ? metrics.topTags.map(tag => `
+            <div class="flock-top-tag">
+              <span class="flock-top-tag-name">${escapeHtml(tag.name)}</span>
+              <span class="flock-top-tag-count">${tag.count}</span>
+            </div>
+          `).join('') : '<p class="flock-analytics-empty">No tags yet</p>'}
+        </div>
+      </div>
+
+      <!-- Contacts Needing Attention -->
+      <div class="flock-analytics-card flock-analytics-attention">
+        <h3 class="flock-analytics-title">Needs Attention</h3>
+        <div class="flock-attention-list">
+          ${metrics.needsAttention.length > 0 ? metrics.needsAttention.slice(0, 4).map(contact => `
+            <div class="flock-attention-item" data-username="${escapeHtml(contact.username)}">
+              <img class="flock-attention-avatar" src="${escapeHtml(contact.profileImageUrl || '')}" alt="${escapeHtml(contact.displayName)}" onerror="this.style.display='none'">
+              <div class="flock-attention-info">
+                <span class="flock-attention-name">${escapeHtml(contact.displayName || contact.username)}</span>
+                <span class="flock-attention-reason">${contact.attentionReason}</span>
+              </div>
+            </div>
+          `).join('') : '<p class="flock-analytics-empty">All caught up!</p>'}
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Add click handlers for attention items
+  container.querySelectorAll('.flock-attention-item').forEach(item => {
+    item.addEventListener('click', () => {
+      showContactDetail(item.dataset.username);
+    });
+  });
+}
+
+function calculateAnalyticsMetrics(contacts, interactions) {
+  const now = Date.now();
+  const dayMs = 24 * 60 * 60 * 1000;
+
+  // Health breakdown
+  const healthBreakdown = { strong: 0, medium: 0, weak: 0 };
+  let totalHealth = 0;
+
+  contacts.forEach(contact => {
+    const strength = getRelationshipStrength(contact, interactions);
+    totalHealth += strength;
+    if (strength >= 60) healthBreakdown.strong++;
+    else if (strength >= 30) healthBreakdown.medium++;
+    else healthBreakdown.weak++;
+  });
+
+  const overallHealth = contacts.length > 0 ? Math.round(totalHealth / contacts.length) : 0;
+
+  // Growth data (last 30 days)
+  const growthData = [];
+  for (let i = 29; i >= 0; i--) {
+    const dayStart = now - (i * dayMs);
+    const dayEnd = dayStart + dayMs;
+    const count = contacts.filter(c => c.createdAt >= dayStart && c.createdAt < dayEnd).length;
+    growthData.push(count);
+  }
+  const growthTrend = contacts.filter(c => c.createdAt >= now - (30 * dayMs)).length;
+
+  // Stage distribution
+  const stages = ['new', 'contacted', 'engaged', 'qualified', 'won', 'lost'];
+  const stageDistribution = {};
+  stages.forEach(stage => {
+    stageDistribution[stage] = contacts.filter(c => (c.pipelineStage || 'new') === stage).length;
+  });
+
+  // Activity by day (last 7 days)
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const shortNames = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+  const activityByDay = [];
+
+  for (let i = 6; i >= 0; i--) {
+    const dayStart = new Date(now - (i * dayMs));
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = dayStart.getTime() + dayMs;
+
+    const count = Object.values(interactions).filter(int =>
+      int.timestamp >= dayStart.getTime() && int.timestamp < dayEnd
+    ).length;
+
+    activityByDay.push({
+      name: dayNames[dayStart.getDay()],
+      shortName: shortNames[dayStart.getDay()],
+      count
+    });
+  }
+
+  // Top tags
+  const tagCounts = {};
+  contacts.forEach(contact => {
+    (contact.tags || []).forEach(tag => {
+      tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+    });
+  });
+  const topTags = Object.entries(tagCounts)
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
+
+  // Contacts needing attention
+  const needsAttention = contacts
+    .map(contact => {
+      const daysSinceInteraction = contact.lastInteraction
+        ? Math.floor((now - contact.lastInteraction) / dayMs)
+        : Infinity;
+
+      let attentionReason = null;
+      if (daysSinceInteraction >= 30) {
+        attentionReason = `No contact in ${daysSinceInteraction} days`;
+      } else if (contact.reminder?.date && contact.reminder.date < now) {
+        attentionReason = 'Overdue reminder';
+      } else if (daysSinceInteraction >= 14) {
+        attentionReason = `${daysSinceInteraction} days since last contact`;
+      }
+
+      return attentionReason ? { ...contact, attentionReason } : null;
+    })
+    .filter(Boolean)
+    .sort((a, b) => {
+      // Prioritize overdue reminders
+      if (a.attentionReason.includes('Overdue')) return -1;
+      if (b.attentionReason.includes('Overdue')) return 1;
+      return 0;
+    });
+
+  return {
+    overallHealth,
+    healthBreakdown,
+    growthData,
+    growthTrend,
+    stageDistribution,
+    activityByDay,
+    topTags,
+    needsAttention
+  };
+}
+
+function renderGrowthChart(data) {
+  const max = Math.max(...data, 1);
+  const width = 100 / data.length;
+
+  return `
+    <svg class="flock-growth-svg" viewBox="0 0 100 40" preserveAspectRatio="none">
+      ${data.map((value, i) => {
+        const height = (value / max) * 35;
+        const x = i * width;
+        return `<rect x="${x}" y="${40 - height}" width="${width - 0.5}" height="${height}" fill="currentColor" opacity="${0.3 + (i / data.length) * 0.7}"/>`;
+      }).join('')}
+    </svg>
+  `;
+}
+
+function getActivityLevel(count) {
+  if (count === 0) return 'activity-none';
+  if (count <= 2) return 'activity-low';
+  if (count <= 5) return 'activity-medium';
+  return 'activity-high';
+}
+
+// ================================
+// NETWORK GRAPH VIEW
+// ================================
+
+let networkState = {
+  nodes: [],
+  zoom: 1,
+  offsetX: 0,
+  offsetY: 0,
+  dragging: null,
+  panning: false,
+  panStart: { x: 0, y: 0 },
+  hoveredNode: null,
+  imageCache: new Map()
+};
+
+async function renderNetworkView() {
+  const canvas = document.getElementById('networkCanvas');
+  const ctx = canvas.getContext('2d');
+  const container = document.getElementById('networkView');
+
+  // Set canvas size
+  const rect = container.getBoundingClientRect();
+  canvas.width = rect.width;
+  canvas.height = rect.height - 50; // Subtract controls height
+
+  // Build nodes from contacts
+  await buildNetworkNodes();
+
+  // Setup event listeners
+  setupNetworkInteractions(canvas, ctx);
+
+  // Render legend
+  renderNetworkLegend();
+
+  // Initial render
+  renderNetwork(canvas, ctx);
+
+  // Animate
+  animateNetwork(canvas, ctx);
+}
+
+async function buildNetworkNodes() {
+  const contacts = allContacts;
+  const lists = await getAllLists();
+
+  networkState.nodes = contacts.map((contact, i) => {
+    const angle = (i / contacts.length) * Math.PI * 2;
+    const radius = 120 + Math.random() * 60;
+
+    return {
+      id: contact.username,
+      contact,
+      x: 200 + Math.cos(angle) * radius,
+      y: 200 + Math.sin(angle) * radius,
+      vx: 0,
+      vy: 0,
+      radius: getNodeRadius(contact),
+      color: getNodeColor(contact, lists),
+      image: null
+    };
+  });
+
+  // Preload images
+  networkState.nodes.forEach(node => {
+    if (node.contact.profileImageUrl) {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        networkState.imageCache.set(node.id, img);
+      };
+      img.src = node.contact.profileImageUrl;
+    }
+  });
+}
+
+function getNodeRadius(contact) {
+  const base = 18;
+  const strength = getRelationshipStrength(contact, allInteractions);
+  return base + (strength / 100) * 10;
+}
+
+function getNodeColor(contact, lists) {
+  // Color by primary list if available
+  if (contact.listIds && contact.listIds.length > 0) {
+    const list = lists.find(l => l.id === contact.listIds[0]);
+    if (list) return list.color;
+  }
+
+  // Otherwise color by stage
+  const stageColors = {
+    new: '#71767B',
+    contacted: '#3B82F6',
+    engaged: '#8B5CF6',
+    qualified: '#F59E0B',
+    won: '#10B981',
+    lost: '#EF4444'
+  };
+
+  return stageColors[contact.pipelineStage] || stageColors.new;
+}
+
+function setupNetworkInteractions(canvas, ctx) {
+  const tooltip = document.getElementById('networkTooltip');
+
+  canvas.onmousedown = (e) => {
+    const { x, y } = getCanvasCoords(e, canvas);
+    const node = findNodeAt(x, y);
+
+    if (node) {
+      networkState.dragging = node;
+    } else {
+      networkState.panning = true;
+      networkState.panStart = { x: e.clientX, y: e.clientY };
+    }
+  };
+
+  canvas.onmousemove = (e) => {
+    const { x, y } = getCanvasCoords(e, canvas);
+
+    if (networkState.dragging) {
+      networkState.dragging.x = x;
+      networkState.dragging.y = y;
+      networkState.dragging.vx = 0;
+      networkState.dragging.vy = 0;
+    } else if (networkState.panning) {
+      const dx = e.clientX - networkState.panStart.x;
+      const dy = e.clientY - networkState.panStart.y;
+      networkState.offsetX += dx;
+      networkState.offsetY += dy;
+      networkState.panStart = { x: e.clientX, y: e.clientY };
+    } else {
+      const node = findNodeAt(x, y);
+      networkState.hoveredNode = node;
+
+      if (node) {
+        canvas.style.cursor = 'pointer';
+        tooltip.innerHTML = `
+          <strong>${escapeHtml(node.contact.displayName || node.contact.username)}</strong>
+          <span>@${escapeHtml(node.contact.username)}</span>
+          ${node.contact.pipelineStage ? `<span class="stage-${node.contact.pipelineStage}">${node.contact.pipelineStage}</span>` : ''}
+        `;
+        tooltip.style.display = 'block';
+        tooltip.style.left = `${e.clientX - canvas.offsetLeft + 10}px`;
+        tooltip.style.top = `${e.clientY - canvas.offsetTop + 10}px`;
+      } else {
+        canvas.style.cursor = 'grab';
+        tooltip.style.display = 'none';
+      }
+    }
+  };
+
+  canvas.onmouseup = () => {
+    networkState.dragging = null;
+    networkState.panning = false;
+  };
+
+  canvas.onmouseleave = () => {
+    networkState.dragging = null;
+    networkState.panning = false;
+    tooltip.style.display = 'none';
+  };
+
+  canvas.ondblclick = (e) => {
+    const { x, y } = getCanvasCoords(e, canvas);
+    const node = findNodeAt(x, y);
+    if (node) {
+      showContactDetail(node.contact.username);
+    }
+  };
+
+  // Zoom controls
+  document.getElementById('networkZoomIn')?.addEventListener('click', () => {
+    networkState.zoom = Math.min(networkState.zoom * 1.2, 3);
+  });
+
+  document.getElementById('networkZoomOut')?.addEventListener('click', () => {
+    networkState.zoom = Math.max(networkState.zoom / 1.2, 0.3);
+  });
+
+  document.getElementById('networkReset')?.addEventListener('click', () => {
+    networkState.zoom = 1;
+    networkState.offsetX = 0;
+    networkState.offsetY = 0;
+  });
+
+  // Mouse wheel zoom
+  canvas.onwheel = (e) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? 0.9 : 1.1;
+    networkState.zoom = Math.max(0.3, Math.min(3, networkState.zoom * delta));
+  };
+}
+
+function getCanvasCoords(e, canvas) {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: (e.clientX - rect.left - networkState.offsetX) / networkState.zoom,
+    y: (e.clientY - rect.top - networkState.offsetY) / networkState.zoom
+  };
+}
+
+function findNodeAt(x, y) {
+  for (const node of networkState.nodes) {
+    const dx = node.x - x;
+    const dy = node.y - y;
+    if (Math.sqrt(dx * dx + dy * dy) < node.radius) {
+      return node;
+    }
+  }
+  return null;
+}
+
+function renderNetwork(canvas, ctx) {
+  ctx.save();
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Apply transform
+  ctx.translate(networkState.offsetX, networkState.offsetY);
+  ctx.scale(networkState.zoom, networkState.zoom);
+
+  // Draw connections between contacts in same list
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+  ctx.lineWidth = 1;
+
+  for (let i = 0; i < networkState.nodes.length; i++) {
+    for (let j = i + 1; j < networkState.nodes.length; j++) {
+      const nodeA = networkState.nodes[i];
+      const nodeB = networkState.nodes[j];
+
+      // Check for shared lists or tags
+      const sharedLists = (nodeA.contact.listIds || []).filter(id =>
+        (nodeB.contact.listIds || []).includes(id)
+      );
+      const sharedTags = (nodeA.contact.tags || []).filter(tag =>
+        (nodeB.contact.tags || []).includes(tag)
+      );
+
+      if (sharedLists.length > 0 || sharedTags.length > 0) {
+        ctx.beginPath();
+        ctx.moveTo(nodeA.x, nodeA.y);
+        ctx.lineTo(nodeB.x, nodeB.y);
+        ctx.stroke();
+      }
+    }
+  }
+
+  // Draw nodes
+  networkState.nodes.forEach(node => {
+    const isHovered = networkState.hoveredNode === node;
+
+    // Glow effect for hovered
+    if (isHovered) {
+      ctx.shadowColor = node.color;
+      ctx.shadowBlur = 20;
+    }
+
+    // Draw circle
+    ctx.beginPath();
+    ctx.arc(node.x, node.y, node.radius, 0, Math.PI * 2);
+    ctx.fillStyle = node.color;
+    ctx.fill();
+
+    // Draw border
+    ctx.strokeStyle = isHovered ? '#fff' : 'rgba(255,255,255,0.3)';
+    ctx.lineWidth = isHovered ? 3 : 1;
+    ctx.stroke();
+
+    ctx.shadowBlur = 0;
+
+    // Draw profile image if available
+    const img = networkState.imageCache.get(node.id);
+    if (img) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(node.x, node.y, node.radius - 2, 0, Math.PI * 2);
+      ctx.clip();
+      ctx.drawImage(img, node.x - node.radius + 2, node.y - node.radius + 2, (node.radius - 2) * 2, (node.radius - 2) * 2);
+      ctx.restore();
+    }
+  });
+
+  ctx.restore();
+}
+
+function animateNetwork(canvas, ctx) {
+  // Simple force simulation
+  const centerX = canvas.width / 2 / networkState.zoom;
+  const centerY = canvas.height / 2 / networkState.zoom;
+
+  networkState.nodes.forEach(node => {
+    if (networkState.dragging === node) return;
+
+    // Attract to center
+    const dx = centerX - node.x;
+    const dy = centerY - node.y;
+    node.vx += dx * 0.0005;
+    node.vy += dy * 0.0005;
+
+    // Repel from other nodes
+    networkState.nodes.forEach(other => {
+      if (other === node) return;
+      const ox = node.x - other.x;
+      const oy = node.y - other.y;
+      const dist = Math.sqrt(ox * ox + oy * oy) || 1;
+      const minDist = node.radius + other.radius + 20;
+
+      if (dist < minDist) {
+        const force = (minDist - dist) / dist * 0.05;
+        node.vx += ox * force;
+        node.vy += oy * force;
+      }
+    });
+
+    // Apply velocity with damping
+    node.x += node.vx;
+    node.y += node.vy;
+    node.vx *= 0.9;
+    node.vy *= 0.9;
+  });
+
+  renderNetwork(canvas, ctx);
+  requestAnimationFrame(() => animateNetwork(canvas, ctx));
+}
+
+async function renderNetworkLegend() {
+  const legend = document.getElementById('networkLegend');
+  const lists = await getAllLists();
+
+  const stages = [
+    { name: 'New', color: '#71767B' },
+    { name: 'Contacted', color: '#3B82F6' },
+    { name: 'Engaged', color: '#8B5CF6' },
+    { name: 'Qualified', color: '#F59E0B' },
+    { name: 'Won', color: '#10B981' },
+    { name: 'Lost', color: '#EF4444' }
+  ];
+
+  legend.innerHTML = `
+    <div class="flock-legend-section">
+      <span class="flock-legend-title">Stages</span>
+      ${stages.map(s => `
+        <span class="flock-legend-item">
+          <span class="flock-legend-dot" style="background: ${s.color}"></span>
+          ${s.name}
+        </span>
+      `).join('')}
+    </div>
+    ${lists.length > 0 ? `
+      <div class="flock-legend-section">
+        <span class="flock-legend-title">Lists</span>
+        ${lists.slice(0, 3).map(l => `
+          <span class="flock-legend-item">
+            <span class="flock-legend-dot" style="background: ${l.color}"></span>
+            ${escapeHtml(l.name)}
+          </span>
+        `).join('')}
+      </div>
+    ` : ''}
+  `;
+}
+
 function updateStats(contacts) {
   document.getElementById('totalContacts').textContent = contacts.length;
 
@@ -1394,6 +2124,241 @@ function openTwitterProfile(username) {
 }
 
 // ================================
+// BULK SELECTION
+// ================================
+
+let bulkSelectMode = false;
+let selectedContacts = new Set();
+
+function toggleBulkSelectMode() {
+  bulkSelectMode = !bulkSelectMode;
+  selectedContacts.clear();
+  updateBulkUI();
+  applyFiltersAndSort();
+}
+
+function toggleContactSelection(username) {
+  if (selectedContacts.has(username)) {
+    selectedContacts.delete(username);
+  } else {
+    selectedContacts.add(username);
+  }
+  updateBulkUI();
+}
+
+function selectAllVisible() {
+  const cards = document.querySelectorAll('.flock-contact-card');
+  cards.forEach(card => {
+    const username = card.dataset.username;
+    if (username) selectedContacts.add(username);
+  });
+  updateBulkUI();
+  applyFiltersAndSort();
+}
+
+function deselectAll() {
+  selectedContacts.clear();
+  updateBulkUI();
+  applyFiltersAndSort();
+}
+
+function updateBulkUI() {
+  const bulkBar = document.getElementById('bulkBar');
+  const bulkToggle = document.getElementById('bulkToggle');
+  const countSpan = bulkBar?.querySelector('.flock-bulk-count');
+
+  if (bulkSelectMode) {
+    bulkToggle?.classList.add('active');
+    if (bulkBar) {
+      bulkBar.style.display = 'flex';
+      if (countSpan) {
+        countSpan.textContent = selectedContacts.size > 0
+          ? `${selectedContacts.size} selected`
+          : '0 selected';
+      }
+    }
+  } else {
+    bulkToggle?.classList.remove('active');
+    if (bulkBar) bulkBar.style.display = 'none';
+  }
+
+  // Update checkboxes and selected state
+  document.querySelectorAll('.flock-contact-card').forEach(card => {
+    const checkbox = card.querySelector('.flock-bulk-checkbox');
+    const isSelected = selectedContacts.has(card.dataset.username);
+    if (checkbox) {
+      checkbox.checked = isSelected;
+    }
+    card.classList.toggle('flock-selected', isSelected);
+  });
+}
+
+async function bulkAddTag() {
+  if (selectedContacts.size === 0) return;
+
+  const tag = prompt('Enter tag to add to selected contacts:');
+  if (!tag) return;
+
+  const result = await chrome.storage.local.get('contacts');
+  const contactsObj = result.contacts || {};
+
+  for (const username of selectedContacts) {
+    if (contactsObj[username]) {
+      const currentTags = contactsObj[username].tags || [];
+      if (!currentTags.includes(tag)) {
+        contactsObj[username].tags = [...currentTags, tag];
+        contactsObj[username].updatedAt = Date.now();
+      }
+    }
+  }
+
+  await chrome.storage.local.set({ contacts: contactsObj });
+  allContacts = Object.values(contactsObj);
+  showToast(`Added "${tag}" to ${selectedContacts.size} contacts`);
+  deselectAll();
+}
+
+async function bulkSetStage() {
+  if (selectedContacts.size === 0) return;
+
+  const stage = prompt('Enter stage (new/contacted/engaged/qualified/won/lost):');
+  if (!stage || !['new', 'contacted', 'engaged', 'qualified', 'won', 'lost'].includes(stage)) {
+    showToast('Invalid stage', 'error');
+    return;
+  }
+
+  const result = await chrome.storage.local.get('contacts');
+  const contactsObj = result.contacts || {};
+
+  for (const username of selectedContacts) {
+    if (contactsObj[username]) {
+      contactsObj[username].pipelineStage = stage;
+      contactsObj[username].updatedAt = Date.now();
+    }
+  }
+
+  await chrome.storage.local.set({ contacts: contactsObj });
+  allContacts = Object.values(contactsObj);
+  showToast(`Moved ${selectedContacts.size} contacts to ${stage}`);
+  deselectAll();
+}
+
+async function bulkAddToList() {
+  if (selectedContacts.size === 0) return;
+
+  const lists = await getAllLists();
+  if (lists.length === 0) {
+    showToast('No lists available. Create a list first.', 'error');
+    return;
+  }
+
+  const listNames = lists.map((l, i) => `${i + 1}. ${l.name}`).join('\n');
+  const choice = prompt(`Select a list (enter number):\n${listNames}`);
+  if (!choice) return;
+
+  const listIndex = parseInt(choice, 10) - 1;
+  if (isNaN(listIndex) || listIndex < 0 || listIndex >= lists.length) {
+    showToast('Invalid selection', 'error');
+    return;
+  }
+
+  const selectedList = lists[listIndex];
+
+  const result = await chrome.storage.local.get('contacts');
+  const contactsObj = result.contacts || {};
+
+  for (const username of selectedContacts) {
+    if (contactsObj[username]) {
+      const currentListIds = contactsObj[username].listIds || [];
+      if (!currentListIds.includes(selectedList.id)) {
+        contactsObj[username].listIds = [...currentListIds, selectedList.id];
+        contactsObj[username].updatedAt = Date.now();
+      }
+    }
+  }
+
+  await chrome.storage.local.set({ contacts: contactsObj });
+  allContacts = Object.values(contactsObj);
+  showToast(`Added ${selectedContacts.size} contacts to "${selectedList.name}"`);
+  deselectAll();
+}
+
+async function bulkDelete() {
+  if (selectedContacts.size === 0) return;
+
+  const confirmed = confirm(`Delete ${selectedContacts.size} contacts? This cannot be undone.`);
+  if (!confirmed) return;
+
+  const result = await chrome.storage.local.get('contacts');
+  const contactsObj = result.contacts || {};
+
+  for (const username of selectedContacts) {
+    delete contactsObj[username];
+  }
+
+  await chrome.storage.local.set({ contacts: contactsObj });
+  allContacts = Object.values(contactsObj);
+  updateStats(allContacts);
+  showToast(`Deleted ${selectedContacts.size} contacts`);
+
+  bulkSelectMode = false;
+  selectedContacts.clear();
+  updateBulkUI();
+  applyFiltersAndSort();
+}
+
+function setupBulkOperations() {
+  // Toggle bulk select mode
+  document.getElementById('bulkToggle')?.addEventListener('click', () => {
+    toggleBulkSelectMode();
+    document.getElementById('bulkToggle').classList.toggle('active', bulkSelectMode);
+  });
+
+  // Select all visible
+  document.getElementById('bulkSelectAll')?.addEventListener('click', () => {
+    selectAllVisible();
+  });
+
+  // Cancel bulk mode
+  document.getElementById('bulkCancel')?.addEventListener('click', () => {
+    bulkSelectMode = false;
+    selectedContacts.clear();
+    document.getElementById('bulkToggle').classList.remove('active');
+    updateBulkUI();
+    applyFiltersAndSort();
+  });
+
+  // Bulk tag
+  document.getElementById('bulkTag')?.addEventListener('click', bulkAddTag);
+
+  // Bulk stage
+  document.getElementById('bulkStage')?.addEventListener('click', bulkSetStage);
+
+  // Bulk list
+  document.getElementById('bulkList')?.addEventListener('click', bulkAddToList);
+
+  // Bulk delete
+  document.getElementById('bulkDelete')?.addEventListener('click', bulkDelete);
+
+  // Handle checkbox clicks via delegation
+  document.getElementById('contactList')?.addEventListener('change', (e) => {
+    if (e.target.classList.contains('flock-bulk-checkbox')) {
+      const card = e.target.closest('.flock-contact-card');
+      if (card) {
+        toggleContactSelection(card.dataset.username);
+      }
+    }
+  });
+
+  // Prevent card click from opening detail when clicking checkbox
+  document.getElementById('contactList')?.addEventListener('click', (e) => {
+    if (e.target.closest('.flock-bulk-checkbox-wrap') && bulkSelectMode) {
+      e.stopPropagation();
+    }
+  });
+}
+
+// ================================
 // FILTERING & SORTING
 // ================================
 
@@ -1466,6 +2431,8 @@ async function switchTab(tab) {
   const remindersView = document.getElementById('remindersView');
   const listsView = document.getElementById('listsView');
   const pipelineView = document.getElementById('pipelineView');
+  const analyticsView = document.getElementById('analyticsView');
+  const networkView = document.getElementById('networkView');
   const emptyState = document.getElementById('emptyState');
   const filterBar = document.getElementById('filterBar');
 
@@ -1473,6 +2440,8 @@ async function switchTab(tab) {
   remindersView.style.display = 'none';
   listsView.style.display = 'none';
   pipelineView.style.display = 'none';
+  analyticsView.style.display = 'none';
+  networkView.style.display = 'none';
 
   if (allContacts.length === 0) {
     filterBar.style.display = 'none';
@@ -1506,6 +2475,18 @@ async function switchTab(tab) {
       filterBar.style.display = 'none';
       pipelineView.style.display = 'flex';
       renderPipelineView(allContacts);
+      break;
+
+    case 'analytics':
+      filterBar.style.display = 'none';
+      analyticsView.style.display = 'flex';
+      await renderAnalyticsView();
+      break;
+
+    case 'network':
+      filterBar.style.display = 'none';
+      networkView.style.display = 'flex';
+      await renderNetworkView();
       break;
   }
 }
@@ -1543,6 +2524,80 @@ function handleSearch(query) {
     const results = await searchContacts(query);
     renderContactList(results, allInteractions);
   }, 200);
+}
+
+async function renderSavedFilters() {
+  const filters = await loadSavedFilters();
+  const container = document.getElementById('savedFilters');
+  if (!container) return;
+
+  container.innerHTML = filters.map(filter => `
+    <div class="flock-saved-filter" data-filter-id="${escapeHtml(filter.id)}" data-query="${escapeHtml(filter.query)}">
+      <span class="flock-saved-filter-name">${escapeHtml(filter.name)}</span>
+      <button class="flock-saved-filter-delete" title="Remove filter">
+        <svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
+      </button>
+    </div>
+  `).join('');
+
+  // Add click handlers
+  container.querySelectorAll('.flock-saved-filter').forEach(el => {
+    el.addEventListener('click', (e) => {
+      if (e.target.closest('.flock-saved-filter-delete')) return;
+      const query = el.dataset.query;
+      document.getElementById('searchInput').value = query;
+      handleSearch(query);
+    });
+  });
+
+  container.querySelectorAll('.flock-saved-filter-delete').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const filterId = btn.closest('.flock-saved-filter').dataset.filterId;
+      await deleteFilter(filterId);
+      renderSavedFilters();
+      showToast('Filter removed');
+    });
+  });
+}
+
+function setupSearchUI() {
+  // Search hints - click to insert
+  document.querySelectorAll('.flock-search-hint').forEach(hint => {
+    hint.addEventListener('click', () => {
+      const input = document.getElementById('searchInput');
+      const currentVal = input.value;
+      const hintText = hint.textContent;
+
+      if (currentVal && !currentVal.endsWith(' ')) {
+        input.value = currentVal + ' ' + hintText;
+      } else {
+        input.value = currentVal + hintText;
+      }
+
+      input.focus();
+      handleSearch(input.value);
+    });
+  });
+
+  // Save search button
+  document.getElementById('saveSearchBtn')?.addEventListener('click', async () => {
+    const query = document.getElementById('searchInput').value.trim();
+    if (!query) {
+      showToast('Enter a search query first', 'error');
+      return;
+    }
+
+    const name = prompt('Name this filter:', query.slice(0, 20));
+    if (!name) return;
+
+    await saveFilter(name, query);
+    renderSavedFilters();
+    showToast('Filter saved');
+  });
+
+  // Initial render
+  renderSavedFilters();
 }
 
 // ================================
@@ -1599,22 +2654,240 @@ function setupKeyboardShortcuts() {
 // ================================
 
 async function handleExport() {
-  try {
-    const data = await exportData();
-    const json = JSON.stringify(data, null, 2);
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
+  showExportModal();
+}
 
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `flock-export-${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+function showExportModal() {
+  const modal = document.createElement('div');
+  modal.className = 'flock-modal-overlay';
+  modal.id = 'exportModal';
+  modal.innerHTML = `
+    <div class="flock-modal flock-export-modal">
+      <div class="flock-modal-header">
+        <h3>Export Contacts</h3>
+        <button class="flock-modal-close" id="closeExport">&times;</button>
+      </div>
+      <div class="flock-modal-body">
+        <p class="flock-export-info">Choose an export format:</p>
+        <div class="flock-export-options">
+          <button class="flock-export-option" data-format="json">
+            <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" stroke="currentColor" stroke-width="2" fill="none"/><path d="M14 2v6h6M8 13h8M8 17h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            <span class="flock-export-label">JSON</span>
+            <span class="flock-export-desc">Full backup with all data</span>
+          </button>
+          <button class="flock-export-option" data-format="csv">
+            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="2" fill="none"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18" stroke="currentColor" stroke-width="2"/></svg>
+            <span class="flock-export-label">CSV</span>
+            <span class="flock-export-desc">Spreadsheet compatible</span>
+          </button>
+          <button class="flock-export-option" data-format="notion">
+            <svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z" stroke="currentColor" stroke-width="2" fill="none"/><path d="M8 8h8M8 12h6M8 16h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            <span class="flock-export-label">Notion</span>
+            <span class="flock-export-desc">Notion database import</span>
+          </button>
+          <button class="flock-export-option" data-format="vcard">
+            <svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2" stroke="currentColor" stroke-width="2" fill="none"/><circle cx="8" cy="10" r="2" stroke="currentColor" stroke-width="2" fill="none"/><path d="M12 14c0-2 1.5-3 3-3h2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            <span class="flock-export-label">vCard</span>
+            <span class="flock-export-desc">Contact cards (.vcf)</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+  modal.style.display = 'flex';
+
+  // Event listeners
+  document.getElementById('closeExport').addEventListener('click', () => closeExportModal());
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) closeExportModal();
+  });
+
+  modal.querySelectorAll('.flock-export-option').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const format = btn.dataset.format;
+      performExport(format);
+      closeExportModal();
+    });
+  });
+}
+
+function closeExportModal() {
+  const modal = document.getElementById('exportModal');
+  if (modal) modal.remove();
+}
+
+async function performExport(format) {
+  try {
+    const contacts = allContacts;
+    const lists = await getAllLists();
+    const today = new Date().toISOString().split('T')[0];
+    let content, filename, type;
+
+    switch (format) {
+      case 'json':
+        const data = await exportData();
+        content = JSON.stringify(data, null, 2);
+        filename = `flock-export-${today}.json`;
+        type = 'application/json';
+        break;
+
+      case 'csv':
+        content = exportToCSV(contacts, lists);
+        filename = `flock-contacts-${today}.csv`;
+        type = 'text/csv';
+        break;
+
+      case 'notion':
+        content = exportToNotion(contacts, lists);
+        filename = `flock-notion-${today}.csv`;
+        type = 'text/csv';
+        break;
+
+      case 'vcard':
+        content = exportToVCard(contacts);
+        filename = `flock-contacts-${today}.vcf`;
+        type = 'text/vcard';
+        break;
+
+      default:
+        throw new Error('Unknown format');
+    }
+
+    downloadFile(content, filename, type);
+    showToast(`Exported ${contacts.length} contacts as ${format.toUpperCase()}`);
   } catch (error) {
     console.error('[Flock] Export error:', error);
+    showToast('Export failed', 'error');
   }
+}
+
+function exportToCSV(contacts, lists) {
+  const headers = [
+    'Username',
+    'Display Name',
+    'Bio',
+    'Followers',
+    'Following',
+    'Stage',
+    'Tags',
+    'Lists',
+    'Notes',
+    'Reminder Date',
+    'Reminder Note',
+    'Profile URL',
+    'Added Date',
+    'Last Interaction'
+  ];
+
+  const rows = contacts.map(c => {
+    const contactLists = (c.listIds || [])
+      .map(id => lists.find(l => l.id === id)?.name || '')
+      .filter(Boolean)
+      .join('; ');
+
+    return [
+      c.username || '',
+      c.displayName || '',
+      (c.bio || '').replace(/"/g, '""'),
+      c.followersCount || 0,
+      c.followingCount || 0,
+      c.pipelineStage || 'new',
+      (c.tags || []).join('; '),
+      contactLists,
+      (c.notes || '').replace(/"/g, '""'),
+      c.reminder?.date ? new Date(c.reminder.date).toISOString() : '',
+      (c.reminder?.note || '').replace(/"/g, '""'),
+      `https://twitter.com/${c.username}`,
+      c.createdAt ? new Date(c.createdAt).toISOString() : '',
+      c.lastInteraction ? new Date(c.lastInteraction).toISOString() : ''
+    ].map(v => `"${v}"`).join(',');
+  });
+
+  return [headers.join(','), ...rows].join('\n');
+}
+
+function exportToNotion(contacts, lists) {
+  // Notion-friendly CSV with specific column types
+  const headers = [
+    'Name',
+    'Twitter Handle',
+    'Status',
+    'Tags',
+    'Notes',
+    'Twitter URL',
+    'Followers',
+    'Bio',
+    'Reminder',
+    'Lists'
+  ];
+
+  const rows = contacts.map(c => {
+    const contactLists = (c.listIds || [])
+      .map(id => lists.find(l => l.id === id)?.name || '')
+      .filter(Boolean)
+      .join(', ');
+
+    return [
+      c.displayName || c.username,
+      `@${c.username}`,
+      c.pipelineStage || 'new',
+      (c.tags || []).join(', '),
+      (c.notes || '').replace(/"/g, '""').replace(/\n/g, ' '),
+      `https://twitter.com/${c.username}`,
+      c.followersCount || 0,
+      (c.bio || '').replace(/"/g, '""').replace(/\n/g, ' '),
+      c.reminder?.date ? new Date(c.reminder.date).toLocaleDateString() : '',
+      contactLists
+    ].map(v => `"${v}"`).join(',');
+  });
+
+  return [headers.join(','), ...rows].join('\n');
+}
+
+function exportToVCard(contacts) {
+  return contacts.map(c => {
+    const lines = [
+      'BEGIN:VCARD',
+      'VERSION:3.0',
+      `FN:${c.displayName || c.username}`,
+      `N:;${c.displayName || c.username};;;`,
+      `NICKNAME:@${c.username}`,
+      `URL:https://twitter.com/${c.username}`
+    ];
+
+    if (c.bio) {
+      lines.push(`NOTE:${c.bio.replace(/\n/g, '\\n')}`);
+    }
+
+    if (c.notes) {
+      lines.push(`X-FLOCK-NOTES:${c.notes.replace(/\n/g, '\\n')}`);
+    }
+
+    if (c.pipelineStage) {
+      lines.push(`X-FLOCK-STAGE:${c.pipelineStage}`);
+    }
+
+    if (c.tags && c.tags.length > 0) {
+      lines.push(`CATEGORIES:${c.tags.join(',')}`);
+    }
+
+    lines.push('END:VCARD');
+    return lines.join('\r\n');
+  }).join('\r\n');
+}
+
+function downloadFile(content, filename, type) {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 // ================================
@@ -1673,6 +2946,7 @@ async function init() {
     document.getElementById('searchInput').addEventListener('input', (e) => {
       handleSearch(e.target.value);
     });
+    setupSearchUI();
 
     // Help modal
     document.getElementById('helpBtn').addEventListener('click', showHelpModal);
@@ -1691,6 +2965,9 @@ async function init() {
 
     // Keyboard shortcuts
     setupKeyboardShortcuts();
+
+    // Bulk operations
+    setupBulkOperations();
 
     // Hide loading
     document.getElementById('loadingState').style.display = 'none';

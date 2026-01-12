@@ -31,7 +31,19 @@
 
     <!-- Search Bar (hidden by default) -->
     <div class="flock-search-bar" id="searchBar">
-      <input type="text" class="flock-search-input" id="searchInput" placeholder="Search contacts, tags, notes...">
+      <div class="flock-search-container">
+        <input type="text" class="flock-search-input" id="searchInput" placeholder="Search contacts, tags, notes...">
+        <button class="flock-search-save" id="saveSearchBtn" title="Save this search">
+          <svg viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+        </button>
+      </div>
+      <div class="flock-search-hints">
+        <span class="flock-search-hint">tag:investor</span>
+        <span class="flock-search-hint">stage:qualified</span>
+        <span class="flock-search-hint">has:reminder</span>
+        <span class="flock-search-hint">has:notes</span>
+      </div>
+      <div class="flock-saved-filters" id="savedFilters"></div>
     </div>
 
     <!-- Stats -->
@@ -56,6 +68,8 @@
       <button class="flock-tab" data-tab="reminders">Reminders</button>
       <button class="flock-tab" data-tab="lists">Lists</button>
       <button class="flock-tab" data-tab="pipeline">Pipeline</button>
+      <button class="flock-tab" data-tab="analytics">Analytics</button>
+      <button class="flock-tab" data-tab="network">Network</button>
     </div>
 
     <!-- Suggestions Bar -->
@@ -83,6 +97,37 @@
         <option value="interaction">Last interaction</option>
         <option value="reminder">Upcoming reminder</option>
       </select>
+      <button class="flock-bulk-toggle" id="bulkToggle" title="Select multiple">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2" fill="none"/><rect x="14" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2" fill="none"/><rect x="3" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2" fill="none"/><rect x="14" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+      </button>
+    </div>
+
+    <!-- Bulk Actions Bar -->
+    <div class="flock-bulk-bar" id="bulkBar" style="display: none;">
+      <div class="flock-bulk-left">
+        <button class="flock-bulk-select-all" id="bulkSelectAll">Select all</button>
+        <span class="flock-bulk-count">0 selected</span>
+      </div>
+      <div class="flock-bulk-actions">
+        <button class="flock-bulk-action" id="bulkTag" title="Add tag">
+          <svg viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><circle cx="7" cy="7" r="1" fill="currentColor"/></svg>
+          Tag
+        </button>
+        <button class="flock-bulk-action" id="bulkStage" title="Set stage">
+          <svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+          Stage
+        </button>
+        <button class="flock-bulk-action" id="bulkList" title="Add to list">
+          <svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+          List
+        </button>
+        <button class="flock-bulk-action flock-bulk-danger" id="bulkDelete" title="Delete">
+          <svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+        </button>
+      </div>
+      <button class="flock-bulk-cancel" id="bulkCancel">
+        <svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
+      </button>
     </div>
 
     <!-- Content Area -->
@@ -105,6 +150,29 @@
       <!-- Pipeline View -->
       <div class="flock-pipeline-view" id="pipelineView" style="display: none;">
         <!-- Pipeline columns will be rendered here -->
+      </div>
+
+      <!-- Analytics View -->
+      <div class="flock-analytics-view" id="analyticsView" style="display: none;">
+        <!-- Analytics will be rendered here -->
+      </div>
+
+      <!-- Network Graph View -->
+      <div class="flock-network-view" id="networkView" style="display: none;">
+        <div class="flock-network-controls">
+          <select class="flock-network-filter" id="networkFilter">
+            <option value="all">All Contacts</option>
+            <option value="list">By List</option>
+            <option value="stage">By Stage</option>
+            <option value="tag">By Tag</option>
+          </select>
+          <button class="flock-network-btn" id="networkZoomIn" title="Zoom in">+</button>
+          <button class="flock-network-btn" id="networkZoomOut" title="Zoom out">−</button>
+          <button class="flock-network-btn" id="networkReset" title="Reset view">⟲</button>
+        </div>
+        <canvas id="networkCanvas"></canvas>
+        <div class="flock-network-tooltip" id="networkTooltip"></div>
+        <div class="flock-network-legend" id="networkLegend"></div>
       </div>
 
       <!-- Contact Detail Panel -->

@@ -543,6 +543,29 @@ class FlockSidebar {
           </div>
         </div>
 
+        <!-- Recent Tweets Section -->
+        <div class="flock-tweets-section">
+          <div class="flock-section-header">
+            <div class="flock-section-label">
+              ${Icons.message}
+              <span>Recent Activity</span>
+            </div>
+            <button class="flock-tweets-refresh" data-action="refresh-tweets" title="Refresh tweets">
+              ${Icons.refresh || '↻'}
+            </button>
+          </div>
+          <div class="flock-tweets-container" id="flockTweetsContainer">
+            <div class="flock-tweets-loading">Loading tweets...</div>
+          </div>
+          <div class="flock-conversation-starters" id="flockConvoStarters" style="display: none;">
+            <div class="flock-starters-header">
+              ${Icons.sparkle}
+              <span>Conversation Starters</span>
+            </div>
+            <div class="flock-starters-list"></div>
+          </div>
+        </div>
+
         <div class="flock-pipeline-section">
           <div class="flock-section-label">Pipeline Stage</div>
           <div class="flock-pipeline-stages">
@@ -779,6 +802,81 @@ class FlockSidebar {
 
       showToast('Interaction logged', 'success');
     });
+
+    // Load tweets asynchronously
+    this.loadTweets(contact);
+
+    // Refresh tweets button
+    const refreshTweetsBtn = this.element.querySelector('[data-action="refresh-tweets"]');
+    if (refreshTweetsBtn) {
+      refreshTweetsBtn.addEventListener('click', () => {
+        TweetFetcher.cache.delete(contact.username);
+        this.loadTweets(contact);
+      });
+    }
+  }
+
+  async loadTweets(contact) {
+    const container = document.getElementById('flockTweetsContainer');
+    const startersContainer = document.getElementById('flockConvoStarters');
+    if (!container) return;
+
+    container.innerHTML = '<div class="flock-tweets-loading">Loading tweets...</div>';
+
+    const tweets = await TweetFetcher.fetchRecentTweets(contact.username);
+
+    if (tweets.length === 0) {
+      container.innerHTML = `
+        <div class="flock-tweets-empty">
+          <p>No recent tweets found</p>
+          <small>Visit their profile to see recent activity</small>
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = tweets.map(tweet => `
+      <div class="flock-tweet-card">
+        <div class="flock-tweet-text">${this.escapeHtml(tweet.text)}</div>
+        <div class="flock-tweet-meta">
+          <span class="flock-tweet-time">${formatRelativeTime(tweet.timestamp)}</span>
+          ${tweet.hasMedia ? `<span class="flock-tweet-media">${tweet.mediaType === 'video' ? '🎥' : '📷'}</span>` : ''}
+          <span class="flock-tweet-stats">
+            ${tweet.likes > 0 ? `<span>❤️ ${tweet.likes}</span>` : ''}
+            ${tweet.retweets > 0 ? `<span>🔄 ${tweet.retweets}</span>` : ''}
+          </span>
+        </div>
+        ${tweet.url ? `<a href="${tweet.url}" target="_blank" class="flock-tweet-link">View tweet →</a>` : ''}
+      </div>
+    `).join('');
+
+    // Generate conversation starters
+    if (startersContainer && tweets.length > 0) {
+      const starters = await TweetFetcher.suggestConversationStarters(contact, tweets);
+      if (starters.length > 0) {
+        startersContainer.style.display = 'block';
+        const startersList = startersContainer.querySelector('.flock-starters-list');
+        startersList.innerHTML = starters.map(starter => `
+          <button class="flock-starter-btn" data-message="${this.escapeHtml(starter)}">
+            "${starter}"
+          </button>
+        `).join('');
+
+        // Click to copy starter
+        startersList.querySelectorAll('.flock-starter-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            navigator.clipboard.writeText(btn.dataset.message);
+            showToast('Copied to clipboard!', 'success');
+          });
+        });
+      }
+    }
+  }
+
+  escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
   }
 
   close() {
@@ -1915,6 +2013,315 @@ const DMTemplates = {
 };
 
 // ================================
+// TWEET FETCHER
+// ================================
+
+const TweetFetcher = {
+  cache: new Map(),
+  cacheExpiry: 5 * 60 * 1000, // 5 minutes
+
+  async fetchRecentTweets(username, maxTweets = 5) {
+    // Check cache first
+    const cached = this.cache.get(username);
+    if (cached && Date.now() - cached.timestamp < this.cacheExpiry) {
+      return cached.tweets;
+    }
+
+    // Scrape tweets from the user's timeline
+    const tweets = [];
+
+    try {
+      // If we're already on their profile, scrape from current page
+      if (window.location.pathname.toLowerCase() === `/${username.toLowerCase()}`) {
+        const tweetElements = document.querySelectorAll('article[data-testid="tweet"]');
+        for (const el of tweetElements) {
+          if (tweets.length >= maxTweets) break;
+          const tweet = this.extractTweetData(el, username);
+          if (tweet) tweets.push(tweet);
+        }
+      } else {
+        // Store tweets from timeline that match this user
+        // We've probably seen them in the feed
+        const tweetElements = document.querySelectorAll('article[data-testid="tweet"]');
+        for (const el of tweetElements) {
+          if (tweets.length >= maxTweets) break;
+          const author = InteractionTracker.getTweetAuthor(el);
+          if (author?.toLowerCase() === username.toLowerCase()) {
+            const tweet = this.extractTweetData(el, username);
+            if (tweet) tweets.push(tweet);
+          }
+        }
+      }
+
+      // Cache results
+      this.cache.set(username, { tweets, timestamp: Date.now() });
+
+      return tweets;
+    } catch (error) {
+      console.error('[Flock] Error fetching tweets:', error);
+      return [];
+    }
+  },
+
+  extractTweetData(tweetElement, username) {
+    try {
+      // Get tweet text
+      const textEl = tweetElement.querySelector('[data-testid="tweetText"]');
+      const text = textEl?.textContent?.trim() || '';
+      if (!text) return null;
+
+      // Get tweet time
+      const timeEl = tweetElement.querySelector('time');
+      const timestamp = timeEl?.getAttribute('datetime') ? new Date(timeEl.getAttribute('datetime')).getTime() : Date.now();
+
+      // Get engagement stats
+      const likeBtn = tweetElement.querySelector('[data-testid="like"], [data-testid="unlike"]');
+      const retweetBtn = tweetElement.querySelector('[data-testid="retweet"], [data-testid="unretweet"]');
+      const replyBtn = tweetElement.querySelector('[data-testid="reply"]');
+
+      const getCount = (btn) => {
+        const text = btn?.getAttribute('aria-label') || '';
+        const match = text.match(/(\d+)/);
+        return match ? parseInt(match[1], 10) : 0;
+      };
+
+      // Get tweet URL
+      const tweetLink = tweetElement.querySelector('a[href*="/status/"]');
+      const tweetUrl = tweetLink?.href || null;
+
+      // Check for media
+      const hasImage = tweetElement.querySelector('[data-testid="tweetPhoto"]') !== null;
+      const hasVideo = tweetElement.querySelector('[data-testid="videoPlayer"]') !== null;
+
+      return {
+        text: text.substring(0, 280),
+        timestamp,
+        likes: getCount(likeBtn),
+        retweets: getCount(retweetBtn),
+        replies: getCount(replyBtn),
+        url: tweetUrl,
+        hasMedia: hasImage || hasVideo,
+        mediaType: hasVideo ? 'video' : (hasImage ? 'image' : null)
+      };
+    } catch (error) {
+      console.error('[Flock] Error extracting tweet data:', error);
+      return null;
+    }
+  },
+
+  async suggestConversationStarters(contact, tweets) {
+    if (!tweets.length) return [];
+
+    // Check if API key is available
+    const result = await chrome.storage.sync.get('anthropicApiKey');
+    if (!result.anthropicApiKey) return [];
+
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': result.anthropicApiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true'
+        },
+        body: JSON.stringify({
+          model: 'claude-3-5-haiku-20241022',
+          max_tokens: 200,
+          messages: [{
+            role: 'user',
+            content: `Based on @${contact.username}'s recent tweets, suggest 3 short, natural conversation starters for a DM. Be specific and reference their content.
+
+Recent tweets:
+${tweets.map((t, i) => `${i + 1}. "${t.text.substring(0, 150)}..."`).join('\n')}
+
+Return ONLY a JSON array of 3 short message ideas (max 100 chars each), no explanation:
+["message1", "message2", "message3"]`
+          }]
+        })
+      });
+
+      const data = await response.json();
+      const text = data.content?.[0]?.text || '';
+      const match = text.match(/\[[\s\S]*\]/);
+      if (match) {
+        return JSON.parse(match[0]);
+      }
+    } catch (error) {
+      console.error('[Flock] Error generating conversation starters:', error);
+    }
+
+    return [];
+  }
+};
+
+// ================================
+// QUICK ADD FROM TIMELINE
+// ================================
+
+const QuickAdd = {
+  activeButton: null,
+  hoverTimeout: null,
+
+  // Extract profile data from a tweet element (minimal version)
+  async extractFromTweet(tweetElement) {
+    const author = InteractionTracker.getTweetAuthor(tweetElement);
+    if (!author) return null;
+
+    // Get display name
+    const userNameArea = tweetElement.querySelector('[data-testid="User-Name"]');
+    let displayName = author;
+    if (userNameArea) {
+      const nameSpan = userNameArea.querySelector('a[href^="/"] span');
+      if (nameSpan) {
+        displayName = nameSpan.textContent?.trim() || author;
+      }
+    }
+
+    // Get avatar
+    const avatar = tweetElement.querySelector('a[href^="/"] img[src*="profile_images"]');
+    let profileImageUrl = null;
+    if (avatar) {
+      profileImageUrl = avatar.src.replace(/_normal\./, '_400x400.');
+    }
+
+    // Check for verified badge
+    const isVerified = userNameArea?.querySelector('[data-testid="icon-verified"], svg[aria-label*="Verified"]') !== null;
+
+    return {
+      username: author,
+      displayName,
+      profileImageUrl,
+      isVerified,
+      bio: null, // Can't get from tweet
+      followersCount: null,
+      followingCount: null,
+      extractedAt: Date.now(),
+    };
+  },
+
+  createQuickAddButton(tweetElement) {
+    const btn = document.createElement('button');
+    btn.className = 'flock-quick-add';
+    btn.innerHTML = `
+      <span class="flock-quick-add-icon">${Icons.plus}</span>
+      <span class="flock-quick-add-text">Flock</span>
+    `;
+    btn.title = 'Save to Flock';
+
+    btn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const author = InteractionTracker.getTweetAuthor(tweetElement);
+      if (!author) {
+        showToast('Could not identify user', 'error');
+        return;
+      }
+
+      // Check if already saved
+      const existing = await getContact(author);
+      if (existing) {
+        showToast(`@${author} already in Flock`, 'success');
+        sidebar.open(author);
+        return;
+      }
+
+      // Show loading state
+      btn.classList.add('flock-saving');
+      btn.innerHTML = `<span class="flock-quick-add-icon">${Icons.spinner}</span><span class="flock-quick-add-text">Saving...</span>`;
+
+      try {
+        const profileData = await this.extractFromTweet(tweetElement);
+        if (profileData) {
+          await saveContact(profileData);
+          btn.classList.remove('flock-saving');
+          btn.classList.add('flock-saved');
+          btn.innerHTML = `<span class="flock-quick-add-icon">${Icons.check}</span><span class="flock-quick-add-text">Saved!</span>`;
+          showToast(`Saved @${author}`, 'success');
+
+          // Refresh timeline indicators
+          TimelineIndicators.contactCache.delete(author);
+          setTimeout(() => {
+            tweetElement.dataset.flockProcessed = '';
+            TimelineIndicators.decorateTimelineAvatars();
+          }, 500);
+        }
+      } catch (error) {
+        btn.classList.remove('flock-saving');
+        btn.innerHTML = `<span class="flock-quick-add-icon">${Icons.plus}</span><span class="flock-quick-add-text">Flock</span>`;
+        showToast('Failed to save', 'error');
+      }
+    });
+
+    return btn;
+  },
+
+  showButton(tweetElement) {
+    // Don't show if already saved
+    const avatarRing = tweetElement.querySelector('.flock-avatar-ring');
+    if (avatarRing) return;
+
+    // Don't show if button already exists
+    if (tweetElement.querySelector('.flock-quick-add')) return;
+
+    const btn = this.createQuickAddButton(tweetElement);
+
+    // Find the right place to insert - near the tweet actions
+    const tweetText = tweetElement.querySelector('[data-testid="tweetText"]');
+    const userNameArea = tweetElement.querySelector('[data-testid="User-Name"]');
+
+    if (userNameArea) {
+      const container = userNameArea.closest('div');
+      if (container) {
+        container.style.position = 'relative';
+        container.appendChild(btn);
+        this.activeButton = btn;
+      }
+    }
+  },
+
+  hideButton() {
+    if (this.activeButton && !this.activeButton.classList.contains('flock-saved')) {
+      this.activeButton.remove();
+      this.activeButton = null;
+    }
+  },
+
+  init() {
+    // Listen for hover on tweets
+    document.addEventListener('mouseover', (e) => {
+      const tweet = e.target.closest('article[data-testid="tweet"]');
+      if (!tweet) return;
+
+      clearTimeout(this.hoverTimeout);
+      this.hoverTimeout = setTimeout(() => {
+        this.showButton(tweet);
+      }, 300); // Small delay to avoid flickering
+    });
+
+    document.addEventListener('mouseout', (e) => {
+      const tweet = e.target.closest('article[data-testid="tweet"]');
+      const relatedTweet = e.relatedTarget?.closest?.('article[data-testid="tweet"]');
+
+      // Only hide if leaving the tweet entirely
+      if (tweet && tweet !== relatedTweet) {
+        clearTimeout(this.hoverTimeout);
+        this.hoverTimeout = setTimeout(() => {
+          // Check if mouse is over the button
+          const btn = tweet.querySelector('.flock-quick-add');
+          if (btn && !btn.matches(':hover')) {
+            this.hideButton();
+          }
+        }, 200);
+      }
+    });
+
+    console.log('[Flock] Quick Add enabled');
+  }
+};
+
+// ================================
 // TIMELINE INDICATORS
 // ================================
 
@@ -2261,6 +2668,9 @@ async function init() {
     // Enable timeline indicators for saved contacts
     TimelineIndicators.startObserving();
     TimelineIndicators.startCacheCleaner();
+
+    // Enable quick add from timeline
+    QuickAdd.init();
 
     console.log('[Flock] Ready');
   } catch (error) {
