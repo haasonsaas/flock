@@ -719,6 +719,9 @@ const Icons = {
   plus: `<svg viewBox="0 0 24 24"><path d="M12 5v14m-7-7h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>`,
   check: `<svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>`,
   close: `<svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>`,
+  // Platform icons
+  twitter: `<svg viewBox="0 0 24 24" class="flock-platform-icon flock-platform-twitter"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" fill="currentColor"/></svg>`,
+  bluesky: `<svg viewBox="0 0 24 24" class="flock-platform-icon flock-platform-bluesky"><path d="M12 10.8c-1.087-2.114-4.046-6.053-6.798-7.995C2.566.944 1.561 1.266.902 1.565.139 1.908 0 3.08 0 3.768c0 .69.378 5.65.624 6.479.815 2.736 3.713 3.66 6.383 3.364.136-.02.275-.039.415-.056-.138.022-.276.04-.415.056-3.912.58-7.387 2.005-2.83 7.078 5.013 5.19 6.87-1.113 7.823-4.308.953 3.195 2.05 9.271 7.733 4.308 4.267-4.308 1.172-6.498-2.74-7.078a8.741 8.741 0 01-.415-.056c.14.017.279.036.415.056 2.67.297 5.568-.628 6.383-3.364.246-.828.624-5.79.624-6.478 0-.69-.139-1.861-.902-2.206-.659-.298-1.664-.62-4.3 1.24C16.046 4.748 13.087 8.687 12 10.8z" fill="currentColor"/></svg>`,
 };
 
 // ================================
@@ -737,8 +740,16 @@ function renderContactCard(contact, interactions = {}) {
   const scoreData = ContactScoring.calculateScore(contact, interactions);
   const scoreColor = ContactScoring.getScoreColor(scoreData.score);
 
+  // Determine platform
+  const platform = contact.platform || 'twitter';
+  const platformIcon = platform === 'bluesky' ? Icons.bluesky : Icons.twitter;
+  const platformLabel = platform === 'bluesky' ? 'Bluesky' : 'Twitter/X';
+  const profileUrl = platform === 'bluesky'
+    ? `https://bsky.app/profile/${contact.username}`
+    : `https://twitter.com/${contact.username}`;
+
   return `
-    <div class="flock-contact-card ${bulkSelectMode ? 'flock-bulk-mode' : ''} ${selectedContacts.has(contact.username) ? 'flock-selected' : ''}" data-username="${escapeHtml(contact.username)}" data-score="${scoreData.score}">
+    <div class="flock-contact-card ${bulkSelectMode ? 'flock-bulk-mode' : ''} ${selectedContacts.has(contact.username) ? 'flock-selected' : ''}" data-username="${escapeHtml(contact.username)}" data-score="${scoreData.score}" data-platform="${platform}">
       ${bulkSelectMode ? `
         <label class="flock-bulk-checkbox-wrap">
           <input type="checkbox" class="flock-bulk-checkbox" ${selectedContacts.has(contact.username) ? 'checked' : ''}>
@@ -767,7 +778,10 @@ function renderContactCard(contact, interactions = {}) {
             ${scoreData.score}
           </span>
         </div>
-        <div class="flock-contact-username">@${escapeHtml(contact.username)}</div>
+        <div class="flock-contact-username">
+          <span class="flock-platform-badge" title="${platformLabel}">${platformIcon}</span>
+          @${escapeHtml(contact.username)}
+        </div>
         <div class="flock-contact-meta">
           <div class="flock-stage-quick" data-username="${escapeHtml(contact.username)}">
             <span class="flock-contact-stage stage-${contact.pipelineStage || 'new'}">
@@ -784,7 +798,7 @@ function renderContactCard(contact, interactions = {}) {
         </div>
       </div>
       <div class="flock-contact-actions">
-        <button class="flock-contact-action flock-action-twitter" title="Open on Twitter" data-action="twitter" data-username="${escapeHtml(contact.username)}">
+        <button class="flock-contact-action flock-action-profile" title="Open on ${platformLabel}" data-action="open-profile" data-url="${escapeHtml(profileUrl)}">
           ${Icons.external}
         </button>
       </div>
@@ -915,12 +929,14 @@ function renderContactList(contacts, interactions = {}) {
     });
   });
 
-  // Twitter button handlers
-  container.querySelectorAll('.flock-contact-action[data-action="twitter"]').forEach(btn => {
+  // Profile button handlers (Twitter/Bluesky)
+  container.querySelectorAll('.flock-contact-action[data-action="open-profile"]').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
-      const username = btn.dataset.username;
-      openTwitterProfile(username);
+      const url = btn.dataset.url;
+      if (url) {
+        chrome.tabs.create({ url });
+      }
     });
   });
 
@@ -957,10 +973,18 @@ async function showContactDetail(username) {
   const scoreData = ContactScoring.calculateScore(contact, interactions);
   const scoreColor = ContactScoring.getScoreColor(scoreData.score);
 
+  // Determine platform
+  const platform = contact.platform || 'twitter';
+  const platformIcon = platform === 'bluesky' ? Icons.bluesky : Icons.twitter;
+  const platformLabel = platform === 'bluesky' ? 'Bluesky' : 'Twitter/X';
+  const profileUrl = platform === 'bluesky'
+    ? `https://bsky.app/profile/${contact.username}`
+    : `https://twitter.com/${contact.username}`;
+
   panel.innerHTML = `
     <div class="flock-detail-header">
       <button class="flock-back-btn" id="backBtn">${Icons.back} Back</button>
-      <button class="flock-open-profile" data-username="${escapeHtml(username)}">${Icons.external}</button>
+      <button class="flock-open-profile" data-url="${escapeHtml(profileUrl)}" title="Open on ${platformLabel}">${Icons.external}</button>
     </div>
     <div class="flock-detail-profile">
       <img
@@ -971,7 +995,10 @@ async function showContactDetail(username) {
       >
       <div class="flock-detail-info">
         <h2 class="flock-detail-name">${escapeHtml(contact.displayName || contact.username)}</h2>
-        <p class="flock-detail-username">@${escapeHtml(contact.username)}</p>
+        <p class="flock-detail-username">
+          <span class="flock-platform-badge flock-platform-badge-lg" title="${platformLabel}">${platformIcon}</span>
+          @${escapeHtml(contact.username)}
+        </p>
         <div class="flock-detail-stats">
           <span>${formatCount(contact.followersCount)} followers</span>
           <span>${formatCount(contact.followingCount)} following</span>
@@ -1143,7 +1170,11 @@ async function showContactDetail(username) {
 
   // Event handlers
   document.getElementById('backBtn').addEventListener('click', hideContactDetail);
-  panel.querySelector('.flock-open-profile').addEventListener('click', () => openTwitterProfile(username));
+  const openProfileBtn = panel.querySelector('.flock-open-profile');
+  openProfileBtn.addEventListener('click', () => {
+    const url = openProfileBtn.dataset.url;
+    if (url) chrome.tabs.create({ url });
+  });
 
   // Stage pill handlers
   panel.querySelectorAll('.flock-stage-pill').forEach(pill => {
@@ -2825,10 +2856,15 @@ function setupBulkOperations() {
 // FILTERING & SORTING
 // ================================
 
-let currentFilter = { stage: '', sort: 'score', followupOnly: false, list: '' };
+let currentFilter = { stage: '', sort: 'score', followupOnly: false, list: '', platform: '' };
 
 function applyFiltersAndSort() {
   let filtered = [...allContacts];
+
+  // Platform filter
+  if (currentFilter.platform) {
+    filtered = filtered.filter(c => (c.platform || 'twitter') === currentFilter.platform);
+  }
 
   // Stage filter
   if (currentFilter.stage) {
@@ -3400,6 +3436,11 @@ async function init() {
     });
 
     // Filter handlers
+    document.getElementById('platformFilter').addEventListener('change', (e) => {
+      currentFilter.platform = e.target.value;
+      applyFiltersAndSort();
+    });
+
     document.getElementById('listFilter').addEventListener('change', (e) => {
       currentFilter.list = e.target.value;
       applyFiltersAndSort();

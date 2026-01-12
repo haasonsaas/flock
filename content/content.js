@@ -106,6 +106,7 @@ async function saveContact(contact) {
   const contacts = await getAllContacts();
   const enrichedContact = {
     ...contact,
+    platform: contact.platform || 'twitter',
     createdAt: contact.createdAt || Date.now(),
     updatedAt: Date.now(),
     pipelineStage: contact.pipelineStage || 'new',

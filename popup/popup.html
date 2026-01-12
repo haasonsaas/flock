@@ -83,6 +83,11 @@
 
     <!-- Filter Bar -->
     <div class="flock-filter-bar" id="filterBar">
+      <select class="flock-filter-select" id="platformFilter">
+        <option value="">All platforms</option>
+        <option value="twitter">Twitter/X</option>
+        <option value="bluesky">Bluesky</option>
+      </select>
       <select class="flock-filter-select" id="listFilter">
         <option value="">All lists</option>
         <!-- Lists will be populated dynamically -->
@@ -196,11 +201,11 @@
           </svg>
         </div>
         <p class="flock-empty-text">No contacts yet</p>
-        <p class="flock-empty-subtext">Visit any Twitter profile and press <kbd>Cmd+Shift+S</kbd> to save your first contact</p>
+        <p class="flock-empty-subtext">Visit any Twitter/X or Bluesky profile and press <kbd>Cmd+Shift+S</kbd> to save your first contact</p>
         <div class="flock-empty-steps">
           <div class="flock-empty-step">
             <span class="flock-step-num">1</span>
-            <span>Go to a Twitter profile</span>
+            <span>Go to a Twitter/X or Bluesky profile</span>
           </div>
           <div class="flock-empty-step">
             <span class="flock-step-num">2</span>
@@ -240,18 +245,18 @@
       </div>
       <div class="flock-modal-body">
         <div class="flock-shortcut-section">
-          <h4>On Twitter</h4>
+          <h4>On Twitter/X & Bluesky</h4>
           <div class="flock-shortcut">
             <span class="flock-shortcut-keys"><kbd>Cmd</kbd><kbd>Shift</kbd><kbd>S</kbd></span>
             <span class="flock-shortcut-desc">Save current profile to Flock</span>
           </div>
           <div class="flock-shortcut">
             <span class="flock-shortcut-keys"><kbd>Cmd</kbd><kbd>Shift</kbd><kbd>F</kbd></span>
-            <span class="flock-shortcut-desc">Open/close Flock sidebar</span>
+            <span class="flock-shortcut-desc">Open/close Flock sidebar (Twitter only)</span>
           </div>
           <div class="flock-shortcut">
             <span class="flock-shortcut-keys"><kbd>Cmd</kbd><kbd>Shift</kbd><kbd>T</kbd></span>
-            <span class="flock-shortcut-desc">Open DM templates</span>
+            <span class="flock-shortcut-desc">Open DM templates (Twitter only)</span>
           </div>
         </div>
         <div class="flock-shortcut-section">

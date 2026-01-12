@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Flock - Twitter CRM",
-  "version": "1.0.0",
-  "description": "Your personal CRM for Twitter. Save profiles, track interactions, manage your pipeline.",
+  "name": "Flock - Social CRM",
+  "version": "1.1.0",
+  "description": "Your personal CRM for Twitter/X and Bluesky. Save profiles, track interactions, manage your pipeline.",
   "permissions": [
     "storage",
     "activeTab",
@@ -16,7 +16,9 @@
   "host_permissions": [
     "https://twitter.com/*",
     "https://x.com/*",
-    "https://api.anthropic.com/*"
+    "https://bsky.app/*",
+    "https://api.anthropic.com/*",
+    "https://public.api.bsky.app/*"
   ],
   "background": {
     "service_worker": "background/service-worker.js",
@@ -27,6 +29,12 @@
       "matches": ["https://twitter.com/*", "https://x.com/*"],
       "css": ["content/content.css"],
       "js": ["content/content.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://bsky.app/*"],
+      "css": ["content/content.css"],
+      "js": ["content/bluesky.js"],
       "run_at": "document_idle"
     }
   ],
@@ -48,7 +56,7 @@
   "web_accessible_resources": [
     {
       "resources": ["sidebar/*", "assets/*"],
-      "matches": ["https://twitter.com/*", "https://x.com/*"]
+      "matches": ["https://twitter.com/*", "https://x.com/*", "https://bsky.app/*"]
     }
   ]
 }
