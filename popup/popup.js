@@ -47,12 +47,16 @@ async function loadSavedFilters() {
 async function saveFilter(name, query) {
   savedFilters.push({ id: Date.now().toString(), name, query, createdAt: Date.now() });
   await chrome.storage.local.set({ savedFilters });
+  // Trigger sync
+  chrome.runtime.sendMessage({ action: 'syncKey', key: 'savedFilters', value: savedFilters });
   return savedFilters;
 }
 
 async function deleteFilter(id) {
   savedFilters = savedFilters.filter(f => f.id !== id);
   await chrome.storage.local.set({ savedFilters });
+  // Trigger sync
+  chrome.runtime.sendMessage({ action: 'syncKey', key: 'savedFilters', value: savedFilters });
   return savedFilters;
 }
 
@@ -524,6 +528,8 @@ async function getAllLists() {
 
 async function saveLists(lists) {
   await chrome.storage.local.set({ lists });
+  // Trigger sync
+  chrome.runtime.sendMessage({ action: 'syncKey', key: 'lists', value: lists });
 }
 
 async function createList(name, color = '#F59E0B') {
@@ -3583,6 +3589,100 @@ function downloadFile(content, filename, type) {
 }
 
 // ================================
+// SYNC STATUS
+// ================================
+
+async function updateSyncStatus() {
+  const syncBtn = document.getElementById('syncBtn');
+  if (!syncBtn) return;
+
+  try {
+    const response = await chrome.runtime.sendMessage({ action: 'getSyncStatus' });
+
+    if (response?.lastSyncTime) {
+      // Recently synced (within 5 minutes)
+      const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
+      if (response.lastSyncTime > fiveMinutesAgo) {
+        syncBtn.classList.add('synced');
+        syncBtn.classList.remove('syncing');
+        syncBtn.title = 'Synced across devices';
+      } else {
+        syncBtn.classList.remove('synced', 'syncing');
+        const ago = formatSyncTime(response.lastSyncTime);
+        syncBtn.title = `Last synced ${ago}`;
+      }
+    } else {
+      syncBtn.classList.remove('synced', 'syncing');
+      syncBtn.title = 'Click to sync';
+    }
+  } catch (error) {
+    console.error('[Flock] Failed to get sync status:', error);
+  }
+}
+
+function formatSyncTime(timestamp) {
+  const diff = Date.now() - timestamp;
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(minutes / 60);
+
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  return new Date(timestamp).toLocaleDateString();
+}
+
+async function handleSyncClick() {
+  const syncBtn = document.getElementById('syncBtn');
+  if (!syncBtn) return;
+
+  syncBtn.classList.add('syncing');
+  syncBtn.classList.remove('synced');
+  syncBtn.title = 'Syncing...';
+
+  try {
+    const response = await chrome.runtime.sendMessage({ action: 'forceSync' });
+
+    if (response?.success) {
+      Toast.show('Synced to cloud', 'success');
+      syncBtn.classList.remove('syncing');
+      syncBtn.classList.add('synced');
+      syncBtn.title = 'Synced across devices';
+    } else {
+      Toast.show(response?.error || 'Sync failed', 'error');
+      syncBtn.classList.remove('syncing');
+    }
+  } catch (error) {
+    console.error('[Flock] Sync error:', error);
+    Toast.show('Sync failed', 'error');
+    syncBtn.classList.remove('syncing');
+  }
+}
+
+function setupSyncButton() {
+  const syncBtn = document.getElementById('syncBtn');
+  if (!syncBtn) return;
+
+  syncBtn.addEventListener('click', handleSyncClick);
+
+  // Check initial status
+  updateSyncStatus();
+
+  // Listen for sync changes from other tabs/devices
+  chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName === 'sync') {
+      updateSyncStatus();
+      // Refresh data if lists or tags changed
+      if (changes.lists || changes.tags || changes.savedFilters) {
+        Toast.show('Received sync from another device', 'info');
+        // Reload the current view to show updated data
+        populateListFilter();
+        loadSavedFilters().then(renderSavedFilters);
+      }
+    }
+  });
+}
+
+// ================================
 // INITIALIZATION
 // ================================
 
@@ -3662,6 +3762,9 @@ async function init() {
     document.getElementById('settingsBtn').addEventListener('click', () => {
       chrome.runtime.openOptionsPage?.();
     });
+
+    // Sync button
+    setupSyncButton();
 
     // Keyboard shortcuts
     setupKeyboardShortcuts();

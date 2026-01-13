@@ -5,6 +5,228 @@
 
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 
+// ================================
+// CHROME SYNC MANAGER
+// ================================
+
+/**
+ * Handles syncing settings, lists, tags, and filters across devices
+ * using chrome.storage.sync (100KB total limit, 8KB per item)
+ *
+ * Synced data:
+ * - lists: List definitions (names, colors)
+ * - tags: Tag definitions
+ * - savedFilters: Saved search filters
+ * - userPreferences: UI preferences
+ * - autopilotSettings: Autopilot configuration
+ * - anthropicApiKey: API key (already synced)
+ *
+ * Local-only data (too large for sync):
+ * - contacts: Full contact database
+ * - interactions: Interaction history
+ */
+
+const SyncManager = {
+  // Keys that should be synced across devices
+  SYNC_KEYS: ['lists', 'tags', 'savedFilters', 'userPreferences'],
+
+  // Sync status
+  lastSyncTime: null,
+  syncInProgress: false,
+
+  /**
+   * Initialize sync - pull from sync storage and merge with local
+   */
+  async initialize() {
+    console.log('[Flock] Initializing sync manager...');
+
+    try {
+      // Get sync data
+      const syncData = await chrome.storage.sync.get(this.SYNC_KEYS);
+      const localData = await chrome.storage.local.get(this.SYNC_KEYS);
+
+      // Merge strategy: sync wins for settings, but preserve local if sync is empty
+      const mergedData = {};
+
+      for (const key of this.SYNC_KEYS) {
+        if (syncData[key] && Object.keys(syncData[key]).length > 0) {
+          // Sync has data - use it (may need to merge with local)
+          mergedData[key] = this.mergeData(key, localData[key], syncData[key]);
+        } else if (localData[key]) {
+          // Only local has data - push to sync
+          mergedData[key] = localData[key];
+        }
+      }
+
+      // Update both storages with merged data
+      if (Object.keys(mergedData).length > 0) {
+        await chrome.storage.local.set(mergedData);
+        await this.pushToSync(mergedData);
+      }
+
+      this.lastSyncTime = Date.now();
+      await chrome.storage.local.set({ lastSyncTime: this.lastSyncTime });
+
+      console.log('[Flock] Sync manager initialized');
+    } catch (error) {
+      console.error('[Flock] Sync initialization error:', error);
+    }
+  },
+
+  /**
+   * Merge local and sync data intelligently
+   */
+  mergeData(key, localData, syncData) {
+    if (!localData) return syncData;
+    if (!syncData) return localData;
+
+    // For arrays (lists, tags, savedFilters), merge by ID and deduplicate
+    if (Array.isArray(syncData) && Array.isArray(localData)) {
+      const merged = [...syncData];
+      const syncIds = new Set(syncData.map(item => item.id));
+
+      for (const localItem of localData) {
+        if (!syncIds.has(localItem.id)) {
+          merged.push(localItem);
+        }
+      }
+
+      return merged;
+    }
+
+    // For objects, deep merge with sync taking precedence
+    if (typeof syncData === 'object' && typeof localData === 'object') {
+      return { ...localData, ...syncData };
+    }
+
+    return syncData;
+  },
+
+  /**
+   * Push data to sync storage with size checking
+   */
+  async pushToSync(data) {
+    try {
+      // Check size before pushing (8KB per item limit)
+      for (const [key, value] of Object.entries(data)) {
+        const size = new Blob([JSON.stringify(value)]).size;
+        if (size > 8000) {
+          console.warn(`[Flock] Sync item ${key} too large (${size} bytes), truncating...`);
+          // For arrays, keep most recent items
+          if (Array.isArray(value)) {
+            data[key] = value.slice(-50); // Keep last 50 items
+          }
+        }
+      }
+
+      await chrome.storage.sync.set(data);
+      this.lastSyncTime = Date.now();
+      await chrome.storage.local.set({ lastSyncTime: this.lastSyncTime });
+
+    } catch (error) {
+      if (error.message?.includes('QUOTA_BYTES')) {
+        console.error('[Flock] Sync quota exceeded, cleaning up...');
+        await this.cleanupSyncStorage();
+      } else {
+        throw error;
+      }
+    }
+  },
+
+  /**
+   * Clean up sync storage when quota exceeded
+   */
+  async cleanupSyncStorage() {
+    const syncData = await chrome.storage.sync.get(this.SYNC_KEYS);
+
+    // Trim arrays to reduce size
+    for (const key of this.SYNC_KEYS) {
+      if (Array.isArray(syncData[key]) && syncData[key].length > 30) {
+        syncData[key] = syncData[key].slice(-30);
+      }
+    }
+
+    await chrome.storage.sync.set(syncData);
+  },
+
+  /**
+   * Sync a specific key when it changes locally
+   */
+  async syncKey(key, value) {
+    if (!this.SYNC_KEYS.includes(key)) return;
+
+    try {
+      await this.pushToSync({ [key]: value });
+      console.log(`[Flock] Synced ${key}`);
+    } catch (error) {
+      console.error(`[Flock] Failed to sync ${key}:`, error);
+    }
+  },
+
+  /**
+   * Get sync status for UI
+   */
+  async getStatus() {
+    const localResult = await chrome.storage.local.get('lastSyncTime');
+    const syncBytesUsed = await new Promise(resolve => {
+      chrome.storage.sync.getBytesInUse(null, resolve);
+    });
+
+    return {
+      lastSyncTime: localResult.lastSyncTime || null,
+      syncBytesUsed,
+      syncBytesTotal: chrome.storage.sync.QUOTA_BYTES || 102400,
+      syncEnabled: true
+    };
+  },
+
+  /**
+   * Force a full sync
+   */
+  async forceSync() {
+    if (this.syncInProgress) {
+      console.log('[Flock] Sync already in progress');
+      return { success: false, error: 'Sync in progress' };
+    }
+
+    this.syncInProgress = true;
+
+    try {
+      const localData = await chrome.storage.local.get(this.SYNC_KEYS);
+      await this.pushToSync(localData);
+
+      this.syncInProgress = false;
+      return { success: true, syncedAt: this.lastSyncTime };
+    } catch (error) {
+      this.syncInProgress = false;
+      return { success: false, error: error.message };
+    }
+  }
+};
+
+// Listen for changes to sync storage (from other devices)
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName === 'sync') {
+    console.log('[Flock] Received sync changes from another device');
+
+    // Update local storage with sync changes
+    const updates = {};
+    for (const [key, { newValue }] of Object.entries(changes)) {
+      if (SyncManager.SYNC_KEYS.includes(key) && newValue !== undefined) {
+        updates[key] = newValue;
+      }
+    }
+
+    if (Object.keys(updates).length > 0) {
+      chrome.storage.local.set(updates);
+      console.log('[Flock] Applied sync updates locally:', Object.keys(updates));
+    }
+  }
+});
+
+// Initialize sync manager
+SyncManager.initialize();
+
 // Handle extension icon click
 chrome.action.onClicked.addListener((tab) => {
   // Open popup - this is handled by default_popup in manifest
@@ -1152,6 +1374,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     case 'runAIProcessingNow':
       runAIProcessing().then(() => sendResponse({ success: true }));
+      return true;
+
+    // Sync operations
+    case 'getSyncStatus':
+      SyncManager.getStatus().then(sendResponse);
+      return true;
+
+    case 'forceSync':
+      SyncManager.forceSync().then(sendResponse);
+      return true;
+
+    case 'syncKey':
+      SyncManager.syncKey(message.key, message.value).then(() => sendResponse({ success: true }));
       return true;
   }
 });

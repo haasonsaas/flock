@@ -179,6 +179,84 @@ async function updateStats() {
 }
 
 // ================================
+// SYNC MANAGEMENT
+// ================================
+
+function formatRelativeTime(timestamp) {
+  if (!timestamp) return 'Never';
+
+  const now = Date.now();
+  const diff = now - timestamp;
+  const seconds = Math.floor(diff / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+
+  if (seconds < 60) return 'Just now';
+  if (minutes < 60) return `${minutes} min ago`;
+  if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+
+  return new Date(timestamp).toLocaleDateString();
+}
+
+async function loadSyncStatus() {
+  try {
+    const response = await chrome.runtime.sendMessage({ action: 'getSyncStatus' });
+
+    const lastSyncEl = document.getElementById('lastSyncTime');
+    const syncBytesEl = document.getElementById('syncBytesUsed');
+    const syncIcon = document.getElementById('syncIcon');
+
+    if (response?.lastSyncTime) {
+      lastSyncEl.textContent = `Synced ${formatRelativeTime(response.lastSyncTime)}`;
+      syncIcon.classList.remove('syncing');
+      syncIcon.classList.add('synced');
+    } else {
+      lastSyncEl.textContent = 'Not synced yet';
+      syncIcon.classList.remove('syncing', 'synced');
+    }
+
+    if (response?.syncBytesUsed !== undefined) {
+      const used = response.syncBytesUsed;
+      const total = response.syncBytesTotal || 102400;
+      const percent = Math.round((used / total) * 100);
+      syncBytesEl.textContent = `${formatBytes(used)} / ${formatBytes(total)} (${percent}%)`;
+    }
+  } catch (error) {
+    console.error('[Flock] Failed to load sync status:', error);
+    document.getElementById('lastSyncTime').textContent = 'Error checking sync';
+  }
+}
+
+async function handleForceSync() {
+  const syncIcon = document.getElementById('syncIcon');
+  const lastSyncEl = document.getElementById('lastSyncTime');
+  const btn = document.getElementById('forceSyncBtn');
+
+  btn.disabled = true;
+  syncIcon.classList.add('syncing');
+  syncIcon.classList.remove('synced');
+  lastSyncEl.textContent = 'Syncing...';
+
+  try {
+    const response = await chrome.runtime.sendMessage({ action: 'forceSync' });
+
+    if (response?.success) {
+      showToast('Synced successfully!', 'success');
+      await loadSyncStatus();
+    } else {
+      showToast(response?.error || 'Sync failed', 'error');
+      syncIcon.classList.remove('syncing');
+    }
+  } catch (error) {
+    console.error('[Flock] Force sync error:', error);
+    showToast('Sync failed', 'error');
+    syncIcon.classList.remove('syncing');
+  }
+
+  btn.disabled = false;
+}
+
+// ================================
 // API KEY MANAGEMENT
 // ================================
 
@@ -243,9 +321,13 @@ async function init() {
   try {
     await updateStats();
     await loadApiKey();
+    await loadSyncStatus();
 
     // Event listeners
     document.getElementById('exportBtn').addEventListener('click', handleExport);
+
+    // Sync
+    document.getElementById('forceSyncBtn').addEventListener('click', handleForceSync);
 
     document.getElementById('importInput').addEventListener('change', (e) => {
       const file = e.target.files?.[0];

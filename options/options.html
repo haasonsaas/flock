@@ -62,6 +62,51 @@
         </div>
       </section>
 
+      <!-- Sync Settings -->
+      <section class="flock-section">
+        <h2 class="flock-section-title">Sync Across Devices</h2>
+        <p class="flock-section-desc">Keep your settings and lists in sync across all your Chrome browsers</p>
+
+        <div class="flock-option-group">
+          <div class="flock-sync-status" id="syncStatusCard">
+            <div class="flock-sync-indicator">
+              <div class="flock-sync-icon" id="syncIcon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 12a9 9 0 11-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/>
+                  <path d="M21 3v5h-5"/>
+                </svg>
+              </div>
+              <div class="flock-sync-info">
+                <span class="flock-sync-label">Sync Status</span>
+                <span class="flock-sync-time" id="lastSyncTime">Checking...</span>
+              </div>
+            </div>
+            <button class="flock-btn flock-btn-secondary" id="forceSyncBtn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 12a9 9 0 11-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/>
+                <path d="M21 3v5h-5"/>
+              </svg>
+              Sync Now
+            </button>
+          </div>
+
+          <div class="flock-sync-details">
+            <div class="flock-sync-row">
+              <span class="flock-sync-key">Storage Used</span>
+              <span class="flock-sync-value" id="syncBytesUsed">--</span>
+            </div>
+            <div class="flock-sync-row">
+              <span class="flock-sync-key">Synced Data</span>
+              <span class="flock-sync-value">Lists, Tags, Filters, Preferences</span>
+            </div>
+            <div class="flock-sync-row">
+              <span class="flock-sync-key">Local Only</span>
+              <span class="flock-sync-value">Contacts, Interactions</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- AI Features -->
       <section class="flock-section">
         <h2 class="flock-section-title">AI Features</h2>

@@ -177,6 +177,24 @@ body::before {
   height: 16px;
 }
 
+/* Sync Button States */
+.flock-sync-btn.synced {
+  color: var(--flock-success);
+}
+
+.flock-sync-btn.syncing svg {
+  animation: sync-spin 1s linear infinite;
+}
+
+@keyframes sync-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.flock-sync-btn:hover {
+  color: var(--flock-amber);
+}
+
 /* ================================
    SEARCH BAR
    ================================ */
