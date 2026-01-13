@@ -871,6 +871,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 const AI_PROCESSING_ALARM_NAME = 'flock-ai-processing';
 const AI_PROCESSING_INTERVAL = 60; // Every hour
+const OPPORTUNITY_ALARM_NAME = 'flock-opportunity-check';
+const OPPORTUNITY_CHECK_INTERVAL = 120; // Every 2 hours
 
 // Also setup alarms when service worker starts (in case it was terminated)
 setupReminderAlarm();
@@ -1422,9 +1424,6 @@ async function processRelationshipScores() {
 // --------------------------------
 // 7. PROACTIVE OPPORTUNITY DETECTION
 // --------------------------------
-
-const OPPORTUNITY_ALARM_NAME = 'flock-opportunity-check';
-const OPPORTUNITY_CHECK_INTERVAL = 120; // Every 2 hours
 
 async function detectOpportunities() {
   console.log('[Flock] Scanning for opportunities...');
