@@ -4045,6 +4045,33 @@ body::before {
   50% { opacity: 1; }
 }
 
+/* Score trend indicators */
+.flock-score-trend {
+  margin-left: 2px;
+  font-size: 9px;
+}
+
+.flock-score-trend:first-child {
+  color: var(--flock-success);
+}
+
+.flock-contact-score:has(.flock-score-trend) {
+  gap: 1px;
+}
+
+/* Rising trend */
+.flock-contact-score .flock-score-trend[data-trend="rising"],
+.flock-score-trend:contains("↑") {
+  color: var(--flock-success);
+  text-shadow: 0 0 6px var(--flock-success);
+}
+
+/* Falling trend */
+.flock-score-trend:contains("↓") {
+  color: var(--flock-error);
+  text-shadow: 0 0 6px var(--flock-error);
+}
+
 /* ================================
    AI INSIGHTS SECTION
    ================================ */
@@ -4090,6 +4117,17 @@ body::before {
 
 .flock-ai-btn-icon {
   font-size: 14px;
+}
+
+.flock-ai-btn-primary {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(245, 158, 11, 0.1) 100%);
+  border-color: var(--flock-amber);
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.2);
+}
+
+.flock-ai-btn-primary:hover {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.3) 0%, rgba(245, 158, 11, 0.15) 100%);
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.4);
 }
 
 .flock-ai-results {
@@ -4425,4 +4463,190 @@ body::before {
   font-family: var(--flock-font-mono);
   font-size: 10px;
   color: var(--flock-text-secondary);
+}
+
+/* Profile Snapshot Styles */
+.flock-ai-snapshot {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.flock-snapshot-oneliner {
+  font-size: 13px;
+  font-style: italic;
+  color: var(--flock-text-primary);
+  padding: 12px;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, transparent 100%);
+  border-left: 3px solid var(--flock-amber);
+  border-radius: 0 4px 4px 0;
+}
+
+.flock-snapshot-summary,
+.flock-snapshot-points,
+.flock-snapshot-starters,
+.flock-snapshot-action {
+  padding: 8px 0;
+}
+
+.flock-snapshot-summary strong,
+.flock-snapshot-points strong,
+.flock-snapshot-starters strong,
+.flock-snapshot-action strong {
+  color: var(--flock-amber);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: block;
+  margin-bottom: 6px;
+}
+
+.flock-snapshot-summary p,
+.flock-snapshot-action p {
+  color: var(--flock-text-secondary);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.flock-snapshot-points ul,
+.flock-snapshot-starters ul {
+  margin: 0;
+  padding-left: 16px;
+  color: var(--flock-text-secondary);
+}
+
+.flock-snapshot-points li,
+.flock-snapshot-starters li {
+  margin: 4px 0;
+}
+
+.flock-snapshot-starters li {
+  font-style: italic;
+  color: var(--flock-text-primary);
+}
+
+.flock-snapshot-action {
+  border-top: 1px solid var(--flock-border);
+  padding-top: 12px;
+  margin-top: 4px;
+}
+
+/* Conversation Threads Styles */
+.flock-ai-threads {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.flock-threads-list strong,
+.flock-threads-questions strong,
+.flock-threads-commitments strong,
+.flock-threads-interests strong,
+.flock-threads-starters strong {
+  color: var(--flock-amber);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.flock-thread {
+  padding: 10px;
+  background: var(--flock-bg-tertiary);
+  border-radius: 4px;
+  border-left: 3px solid var(--flock-border);
+  margin-bottom: 6px;
+}
+
+.flock-thread-active {
+  border-left-color: #10B981;
+  background: linear-gradient(90deg, rgba(16, 185, 129, 0.1) 0%, transparent 100%);
+}
+
+.flock-thread-stalled {
+  border-left-color: #F59E0B;
+  background: linear-gradient(90deg, rgba(245, 158, 11, 0.1) 0%, transparent 100%);
+}
+
+.flock-thread-resolved {
+  border-left-color: var(--flock-text-tertiary);
+  opacity: 0.7;
+}
+
+.flock-thread-topic {
+  color: var(--flock-text-primary);
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.flock-thread-meta {
+  display: flex;
+  gap: 12px;
+  font-size: 10px;
+  color: var(--flock-text-secondary);
+}
+
+.flock-thread-status {
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.flock-thread-active .flock-thread-status {
+  color: #10B981;
+}
+
+.flock-thread-stalled .flock-thread-status {
+  color: #F59E0B;
+}
+
+.flock-threads-questions ul,
+.flock-threads-commitments ul,
+.flock-threads-starters ul {
+  margin: 0;
+  padding-left: 16px;
+  color: var(--flock-text-secondary);
+}
+
+.flock-threads-questions li,
+.flock-threads-commitments li,
+.flock-threads-starters li {
+  margin: 4px 0;
+}
+
+.flock-threads-starters li {
+  font-style: italic;
+  color: var(--flock-text-primary);
+}
+
+.flock-threads-interests {
+  padding-top: 8px;
+}
+
+.flock-interests-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.flock-interest-tag {
+  display: inline-block;
+  padding: 3px 8px;
+  background: var(--flock-bg-tertiary);
+  border: 1px solid var(--flock-border);
+  border-radius: 10px;
+  font-size: 10px;
+  color: var(--flock-text-secondary);
+}
+
+.flock-threads-commitments {
+  background: rgba(239, 68, 68, 0.05);
+  padding: 10px;
+  border-radius: 4px;
+  border-left: 3px solid rgba(239, 68, 68, 0.5);
+}
+
+.flock-threads-commitments li {
+  color: var(--flock-text-primary);
 }

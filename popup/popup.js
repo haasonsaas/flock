@@ -739,8 +739,13 @@ function renderContactCard(contact, interactions = {}) {
   const lastInteraction = contactInteractions.length > 0
     ? Math.max(...contactInteractions.map(i => i.timestamp))
     : contact.lastInteraction;
-  const strength = getRelationshipStrength(contact, interactions);
+
+  // Use AI relationship score if available, otherwise calculate locally
+  const aiScore = contact.relationshipScore;
+  const strength = aiScore?.score ?? getRelationshipStrength(contact, interactions);
   const strengthClass = strength >= 60 ? 'strong' : strength >= 30 ? 'medium' : 'weak';
+  const trendIcon = aiScore?.trend === 'rising' ? '↑' : aiScore?.trend === 'falling' ? '↓' : '';
+  const maturityStage = aiScore?.maturityStage || '';
 
   // Calculate contact score
   const scoreData = ContactScoring.calculateScore(contact, interactions);
@@ -780,8 +785,8 @@ function renderContactCard(contact, interactions = {}) {
       <div class="flock-contact-info">
         <div class="flock-contact-name-row">
           <span class="flock-contact-name">${escapeHtml(contact.displayName || contact.username)}</span>
-          <span class="flock-contact-score" style="--score-color: ${scoreColor}" title="${scoreData.label}: Influence ${scoreData.components.influence}, Opportunity ${scoreData.components.opportunity}, Engagement ${scoreData.components.engagement}, Relationship ${scoreData.components.relationship}">
-            ${scoreData.score}
+          <span class="flock-contact-score" style="--score-color: ${scoreColor}" title="${maturityStage ? `${maturityStage} · ` : ''}${scoreData.label}: Influence ${scoreData.components.influence}, Opportunity ${scoreData.components.opportunity}, Engagement ${scoreData.components.engagement}, Relationship ${scoreData.components.relationship}">
+            ${scoreData.score}${trendIcon ? `<span class="flock-score-trend">${trendIcon}</span>` : ''}
           </span>
         </div>
         <div class="flock-contact-username">
@@ -1168,17 +1173,25 @@ async function showContactDetail(username) {
     <div class="flock-detail-section flock-ai-section">
       <h3>${Icons.sparkle} AI Insights</h3>
       <div class="flock-ai-actions">
+        <button class="flock-ai-btn flock-ai-btn-primary" id="getSnapshotBtn">
+          <span class="flock-ai-btn-icon">📋</span>
+          <span>Quick Brief</span>
+        </button>
         <button class="flock-ai-btn" id="getNextActionBtn">
           <span class="flock-ai-btn-icon">🎯</span>
-          <span>Get Next Best Action</span>
+          <span>Next Action</span>
+        </button>
+        <button class="flock-ai-btn" id="getThreadsBtn">
+          <span class="flock-ai-btn-icon">💬</span>
+          <span>Threads</span>
         </button>
         <button class="flock-ai-btn" id="getHealthBtn">
           <span class="flock-ai-btn-icon">💚</span>
-          <span>Analyze Relationship</span>
+          <span>Health</span>
         </button>
         <button class="flock-ai-btn" id="getEventsBtn">
           <span class="flock-ai-btn-icon">📅</span>
-          <span>Find Opportunities</span>
+          <span>Events</span>
         </button>
       </div>
       <div class="flock-ai-results" id="aiResults" style="display: none;">
@@ -1356,6 +1369,115 @@ async function showContactDetail(username) {
       }
     } else {
       aiContent.innerHTML = `<p class="flock-ai-error">Failed to analyze: ${escapeHtml(response.error || 'Unknown error')}</p>`;
+    }
+  });
+
+  document.getElementById('getSnapshotBtn')?.addEventListener('click', async () => {
+    aiResults.style.display = 'block';
+    aiLoading.style.display = 'flex';
+    aiContent.innerHTML = '';
+
+    const response = await chrome.runtime.sendMessage({
+      action: 'getProfileSnapshot',
+      contact,
+      interactions: Object.values(interactions)
+    });
+
+    aiLoading.style.display = 'none';
+
+    if (response.success && response.data) {
+      const d = response.data;
+      aiContent.innerHTML = `
+        <div class="flock-ai-result flock-ai-snapshot">
+          <div class="flock-snapshot-oneliner">"${escapeHtml(d.oneLiner)}"</div>
+          <div class="flock-snapshot-summary">
+            <strong>Relationship:</strong>
+            <p>${escapeHtml(d.relationshipSummary)}</p>
+          </div>
+          ${d.talkingPoints?.length ? `
+            <div class="flock-snapshot-points">
+              <strong>Quick Talking Points:</strong>
+              <ul>${d.talkingPoints.map(p => `<li>${escapeHtml(p)}</li>`).join('')}</ul>
+            </div>
+          ` : ''}
+          ${d.conversationStarters?.length ? `
+            <div class="flock-snapshot-starters">
+              <strong>Conversation Starters:</strong>
+              <ul>${d.conversationStarters.map(s => `<li>"${escapeHtml(s)}"</li>`).join('')}</ul>
+            </div>
+          ` : ''}
+          ${d.nextBestAction ? `
+            <div class="flock-snapshot-action">
+              <strong>Next Best Action:</strong>
+              <p>${escapeHtml(d.nextBestAction)}</p>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    } else {
+      aiContent.innerHTML = `<p class="flock-ai-error">Failed to generate snapshot: ${escapeHtml(response.error || 'Unknown error')}</p>`;
+    }
+  });
+
+  document.getElementById('getThreadsBtn')?.addEventListener('click', async () => {
+    aiResults.style.display = 'block';
+    aiLoading.style.display = 'flex';
+    aiContent.innerHTML = '';
+
+    const response = await chrome.runtime.sendMessage({
+      action: 'getConversationThreads',
+      contact,
+      interactions: Object.values(interactions)
+    });
+
+    aiLoading.style.display = 'none';
+
+    if (response.success && response.data) {
+      const d = response.data;
+      aiContent.innerHTML = `
+        <div class="flock-ai-result flock-ai-threads">
+          ${d.threads?.length ? `
+            <div class="flock-threads-list">
+              <strong>Active Threads:</strong>
+              ${d.threads.map(t => `
+                <div class="flock-thread flock-thread-${t.status}">
+                  <div class="flock-thread-topic">${escapeHtml(t.topic)}</div>
+                  <div class="flock-thread-meta">
+                    <span class="flock-thread-status">${t.status}</span>
+                    <span class="flock-thread-last">Last: ${escapeHtml(t.lastMessage || 'N/A')}</span>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          ` : '<p class="flock-ai-empty">No active conversation threads found.</p>'}
+          ${d.openQuestions?.length ? `
+            <div class="flock-threads-questions">
+              <strong>Open Questions:</strong>
+              <ul>${d.openQuestions.map(q => `<li>${escapeHtml(q)}</li>`).join('')}</ul>
+            </div>
+          ` : ''}
+          ${d.commitments?.length ? `
+            <div class="flock-threads-commitments">
+              <strong>Pending Commitments:</strong>
+              <ul>${d.commitments.map(c => `<li>${escapeHtml(c)}</li>`).join('')}</ul>
+            </div>
+          ` : ''}
+          ${d.sharedInterests?.length ? `
+            <div class="flock-threads-interests">
+              <strong>Shared Interests:</strong>
+              <span class="flock-interests-list">${d.sharedInterests.map(i => `<span class="flock-interest-tag">${escapeHtml(i)}</span>`).join('')}</span>
+            </div>
+          ` : ''}
+          ${d.conversationStarters?.length ? `
+            <div class="flock-threads-starters">
+              <strong>Continue With:</strong>
+              <ul>${d.conversationStarters.map(s => `<li>"${escapeHtml(s)}"</li>`).join('')}</ul>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    } else {
+      aiContent.innerHTML = `<p class="flock-ai-error">Failed to analyze threads: ${escapeHtml(response.error || 'Unknown error')}</p>`;
     }
   });
 

@@ -877,6 +877,7 @@ setupReminderAlarm();
 setupDailyDigest();
 setupAutopilotAlarm();
 setupAIProcessingAlarm();
+setupOpportunityAlarm();
 
 // Initial check on startup
 setTimeout(checkReminders, 5000);
@@ -1299,6 +1300,412 @@ async function processContactsForEvents() {
 }
 
 // --------------------------------
+// 6. SMART RELATIONSHIP SCORE ENGINE
+// --------------------------------
+
+async function calculateRelationshipScore(contact, interactions) {
+  const contactInteractions = interactions
+    ?.filter(i => i.username === contact.username || i.username === `bsky:${contact.username}`)
+    || [];
+
+  const now = Date.now();
+  const thirtyDaysAgo = now - (30 * 24 * 60 * 60 * 1000);
+  const sixtyDaysAgo = now - (60 * 24 * 60 * 60 * 1000);
+
+  // Recent interactions (last 30 days)
+  const recentInteractions = contactInteractions.filter(i => i.timestamp > thirtyDaysAgo);
+  const olderInteractions = contactInteractions.filter(i => i.timestamp > sixtyDaysAgo && i.timestamp <= thirtyDaysAgo);
+
+  // Factor 1: Velocity (interaction frequency trend)
+  const recentCount = recentInteractions.length;
+  const olderCount = olderInteractions.length;
+  const velocityTrend = olderCount > 0 ? (recentCount - olderCount) / olderCount : (recentCount > 0 ? 1 : 0);
+  const velocityScore = Math.min(25, Math.max(0, 12.5 + (velocityTrend * 12.5) + (recentCount * 2)));
+
+  // Factor 2: Quality (engagement depth - DMs and replies worth more than likes)
+  const qualityWeights = { dm: 5, reply: 4, quote: 4, mention: 3, retweet: 2, like: 1, view: 0.5, follow: 3 };
+  const qualitySum = recentInteractions.reduce((sum, i) => sum + (qualityWeights[i.type] || 1), 0);
+  const qualityScore = Math.min(25, qualitySum * 2);
+
+  // Factor 3: Recency (when was last interaction)
+  const lastInteraction = contact.lastInteraction || contactInteractions[0]?.timestamp;
+  const daysSinceLast = lastInteraction ? Math.floor((now - lastInteraction) / (1000 * 60 * 60 * 24)) : 999;
+  const recencyScore = daysSinceLast <= 3 ? 25 : daysSinceLast <= 7 ? 20 : daysSinceLast <= 14 ? 15 : daysSinceLast <= 30 ? 10 : daysSinceLast <= 60 ? 5 : 0;
+
+  // Factor 4: Depth (conversation turns - back and forth)
+  const conversationDepth = contactInteractions.filter(i => ['dm', 'reply', 'mention'].includes(i.type)).length;
+  const depthScore = Math.min(15, conversationDepth * 3);
+
+  // Factor 5: Sentiment (from AI analysis if available)
+  const analyzedInteractions = contactInteractions.filter(i => i.aiAnalysis?.sentiment);
+  const sentimentCounts = { positive: 0, neutral: 0, negative: 0 };
+  analyzedInteractions.forEach(i => sentimentCounts[i.aiAnalysis.sentiment]++);
+  const sentimentScore = analyzedInteractions.length > 0
+    ? Math.min(10, ((sentimentCounts.positive * 2) - (sentimentCounts.negative * 2) + 5))
+    : 5;
+
+  // Calculate total and trend
+  const totalScore = Math.round(velocityScore + qualityScore + recencyScore + depthScore + sentimentScore);
+
+  // Determine trend based on velocity
+  const trend = velocityTrend > 0.2 ? 'rising' : velocityTrend < -0.2 ? 'falling' : 'stable';
+
+  // Determine maturity stage
+  let maturityStage = 'cold';
+  if (totalScore >= 80) maturityStage = 'advocate';
+  else if (totalScore >= 60) maturityStage = 'hot';
+  else if (totalScore >= 40) maturityStage = 'warm';
+  else if (totalScore >= 20) maturityStage = 'cooling';
+
+  return {
+    score: totalScore,
+    trend,
+    maturityStage,
+    factors: {
+      velocity: Math.round(velocityScore),
+      quality: Math.round(qualityScore),
+      recency: Math.round(recencyScore),
+      depth: Math.round(depthScore),
+      sentiment: Math.round(sentimentScore)
+    },
+    insights: {
+      recentInteractions: recentCount,
+      daysSinceContact: daysSinceLast === 999 ? null : daysSinceLast,
+      dominantInteractionType: getMostFrequentType(recentInteractions),
+      conversationDepth
+    },
+    calculatedAt: now
+  };
+}
+
+function getMostFrequentType(interactions) {
+  if (!interactions.length) return null;
+  const counts = {};
+  interactions.forEach(i => counts[i.type] = (counts[i.type] || 0) + 1);
+  return Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0];
+}
+
+async function processRelationshipScores() {
+  console.log('[Flock] Processing relationship scores...');
+
+  const contactsResult = await chrome.storage.local.get('contacts');
+  const contacts = contactsResult.contacts || {};
+  const interactionsResult = await chrome.storage.local.get('interactions');
+  const interactions = Object.values(interactionsResult.interactions || {});
+
+  let processed = 0;
+
+  for (const [key, contact] of Object.entries(contacts)) {
+    // Skip if scored recently (within 6 hours)
+    if (contact.relationshipScore?.calculatedAt &&
+        (Date.now() - contact.relationshipScore.calculatedAt) < (6 * 60 * 60 * 1000)) {
+      continue;
+    }
+
+    const score = await calculateRelationshipScore(contact, interactions);
+    contacts[key] = {
+      ...contact,
+      relationshipScore: score,
+      updatedAt: Date.now()
+    };
+
+    processed++;
+    if (processed >= 20) break; // Limit per batch
+  }
+
+  if (processed > 0) {
+    await chrome.storage.local.set({ contacts });
+    console.log(`[Flock] Updated ${processed} relationship scores`);
+  }
+}
+
+// --------------------------------
+// 7. PROACTIVE OPPORTUNITY DETECTION
+// --------------------------------
+
+const OPPORTUNITY_ALARM_NAME = 'flock-opportunity-check';
+const OPPORTUNITY_CHECK_INTERVAL = 120; // Every 2 hours
+
+async function detectOpportunities() {
+  console.log('[Flock] Scanning for opportunities...');
+
+  const contactsResult = await chrome.storage.local.get('contacts');
+  const contacts = Object.values(contactsResult.contacts || {});
+  const interactionsResult = await chrome.storage.local.get('interactions');
+  const interactions = Object.values(interactionsResult.interactions || {});
+
+  const opportunities = [];
+  const now = Date.now();
+
+  for (const contact of contacts) {
+    // Skip contacts with low scores
+    if (contact.relationshipScore?.score < 20) continue;
+
+    const contactInteractions = interactions.filter(
+      i => i.username === contact.username || i.username === `bsky:${contact.username}`
+    );
+
+    // Opportunity 1: Stale hot relationship (was active, now cooling)
+    if (contact.relationshipScore?.maturityStage === 'hot' &&
+        contact.relationshipScore?.trend === 'falling') {
+      opportunities.push({
+        type: 'cooling_relationship',
+        contact: contact.username,
+        priority: 'high',
+        message: `${contact.displayName || contact.username} engagement is dropping - reach out now`,
+        suggestedAction: 'Send a DM or reply to their recent content',
+        detectedAt: now
+      });
+    }
+
+    // Opportunity 2: Unanswered message (they replied, you didn't respond)
+    const recentReplies = contactInteractions
+      .filter(i => i.type === 'reply' && i.direction === 'inbound' && i.timestamp > (now - 7 * 24 * 60 * 60 * 1000))
+      .sort((a, b) => b.timestamp - a.timestamp);
+
+    if (recentReplies.length > 0) {
+      const lastInbound = recentReplies[0];
+      const hasOutboundAfter = contactInteractions.some(
+        i => i.direction === 'outbound' && i.timestamp > lastInbound.timestamp
+      );
+      if (!hasOutboundAfter) {
+        opportunities.push({
+          type: 'unanswered_message',
+          contact: contact.username,
+          priority: 'high',
+          message: `You haven't responded to ${contact.displayName || contact.username}'s message`,
+          suggestedAction: 'Reply to continue the conversation',
+          detectedAt: now
+        });
+      }
+    }
+
+    // Opportunity 3: Perfect timing (high-score contact with no recent interaction)
+    const daysSinceLast = contact.relationshipScore?.insights?.daysSinceContact;
+    if (contact.relationshipScore?.score >= 50 && daysSinceLast >= 7 && daysSinceLast <= 14) {
+      opportunities.push({
+        type: 'reconnect_window',
+        contact: contact.username,
+        priority: 'medium',
+        message: `Good time to reconnect with ${contact.displayName || contact.username}`,
+        suggestedAction: 'Share something valuable or check in',
+        detectedAt: now
+      });
+    }
+
+    // Opportunity 4: Rising star (rapidly improving relationship)
+    if (contact.relationshipScore?.trend === 'rising' &&
+        contact.relationshipScore?.factors?.velocity >= 20) {
+      opportunities.push({
+        type: 'rising_engagement',
+        contact: contact.username,
+        priority: 'medium',
+        message: `${contact.displayName || contact.username} is increasingly engaged with you`,
+        suggestedAction: 'Capitalize on momentum - propose a call or collaboration',
+        detectedAt: now
+      });
+    }
+  }
+
+  // Store opportunities
+  await chrome.storage.local.set({
+    opportunities: opportunities.slice(0, 20), // Keep top 20
+    opportunitiesUpdatedAt: now
+  });
+
+  // Send notification for high-priority opportunities
+  const highPriority = opportunities.filter(o => o.priority === 'high');
+  if (highPriority.length > 0) {
+    const message = highPriority.length === 1
+      ? highPriority[0].message
+      : `${highPriority.length} contacts need your attention`;
+
+    chrome.notifications.create('flock-opportunities', {
+      type: 'basic',
+      iconUrl: 'assets/icon-128.png',
+      title: 'Flock Opportunity Alert',
+      message,
+      priority: 2,
+      buttons: [{ title: 'View in Flock' }]
+    });
+  }
+
+  console.log(`[Flock] Detected ${opportunities.length} opportunities`);
+  return opportunities;
+}
+
+async function setupOpportunityAlarm() {
+  await chrome.alarms.clear(OPPORTUNITY_ALARM_NAME);
+  chrome.alarms.create(OPPORTUNITY_ALARM_NAME, {
+    delayInMinutes: 10,
+    periodInMinutes: OPPORTUNITY_CHECK_INTERVAL
+  });
+  console.log('[Flock] Opportunity detection scheduled');
+}
+
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === OPPORTUNITY_ALARM_NAME) {
+    detectOpportunities();
+  }
+});
+
+// --------------------------------
+// 8. CONVERSATION CONTINUATION INTELLIGENCE
+// --------------------------------
+
+async function analyzeConversationThreads(contact, interactions) {
+  const contactInteractions = interactions
+    ?.filter(i => i.username === contact.username || i.username === `bsky:${contact.username}`)
+    ?.sort((a, b) => b.timestamp - a.timestamp)
+    ?.slice(0, 20) || [];
+
+  if (contactInteractions.length === 0) {
+    return { threads: [], suggestions: [], openQuestions: [] };
+  }
+
+  const systemPrompt = `You are an AI that analyzes conversation history to identify open threads, unanswered questions, and suggest natural ways to continue conversations. Return ONLY valid JSON.`;
+
+  const conversationSummary = contactInteractions.map(i => {
+    const direction = i.direction || 'unknown';
+    const date = new Date(i.timestamp).toLocaleDateString();
+    return `[${date}] ${direction === 'outbound' ? 'You' : 'Them'} - ${i.type}: ${i.description || 'No description'}`;
+  }).join('\n');
+
+  const userPrompt = `Analyze this conversation history and identify continuation opportunities:
+
+**Contact:** @${contact.username} (${contact.displayName || 'Unknown'})
+**Bio:** ${contact.bio || 'No bio'}
+**Tags:** ${contact.tags?.join(', ') || 'None'}
+
+**Conversation History (newest first):**
+${conversationSummary}
+
+Analyze and return:
+{
+  "threads": [
+    {
+      "topic": "Main topic of this thread",
+      "status": "open/resolved/stale",
+      "lastActivity": "Who spoke last and when",
+      "yourTurn": true/false
+    }
+  ],
+  "openQuestions": ["Any questions asked but not answered"],
+  "commitments": ["Any promises or next steps mentioned"],
+  "sharedInterests": ["Topics you both engaged with"],
+  "conversationStarters": [
+    {
+      "message": "A natural way to restart conversation",
+      "context": "Why this would work",
+      "timing": "now/wait"
+    }
+  ],
+  "relationshipMomentum": "building/maintaining/fading",
+  "suggestedNextMove": "Best next action to take"
+}
+
+Return ONLY the JSON.`;
+
+  const result = await callAnthropic(systemPrompt, userPrompt);
+
+  if (result.error) return { error: result.error };
+
+  try {
+    const jsonMatch = result.content.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]);
+    }
+  } catch (e) {
+    return { error: 'Failed to parse response' };
+  }
+  return { error: 'Invalid response format' };
+}
+
+// --------------------------------
+// 9. CONTEXTUAL PROFILE SNAPSHOTS
+// --------------------------------
+
+async function generateProfileSnapshot(contact, interactions) {
+  const contactInteractions = interactions
+    ?.filter(i => i.username === contact.username || i.username === `bsky:${contact.username}`)
+    ?.sort((a, b) => b.timestamp - a.timestamp)
+    ?.slice(0, 15) || [];
+
+  const score = contact.relationshipScore || await calculateRelationshipScore(contact, interactions);
+
+  const systemPrompt = `You are an AI assistant that creates concise, actionable relationship briefs for a personal CRM. Be direct and specific. Return ONLY valid JSON.`;
+
+  const interactionSummary = contactInteractions.slice(0, 10).map(i => {
+    const date = new Date(i.timestamp).toLocaleDateString();
+    const sentiment = i.aiAnalysis?.sentiment || 'unknown';
+    return `- ${date}: ${i.type} (${sentiment}) - ${i.description || 'N/A'}`;
+  }).join('\n');
+
+  const userPrompt = `Create a contextual profile snapshot for quick reference before engaging:
+
+**Contact:** @${contact.username}
+**Name:** ${contact.displayName || 'Unknown'}
+**Platform:** ${contact.platform || 'twitter'}
+**Bio:** ${contact.bio || 'No bio'}
+**Followers:** ${contact.followersCount?.toLocaleString() || 'Unknown'}
+**Following:** ${contact.followingCount?.toLocaleString() || 'Unknown'}
+
+**Your Relationship:**
+- Score: ${score.score}/100 (${score.maturityStage}, ${score.trend})
+- Pipeline Stage: ${contact.pipelineStage || 'new'}
+- Tags: ${contact.tags?.join(', ') || 'None'}
+- Days since contact: ${score.insights?.daysSinceContact ?? 'Never'}
+- Your notes: ${contact.notes || 'None'}
+
+**Recent Interactions:**
+${interactionSummary || 'No recorded interactions'}
+
+**Enriched Data:**
+- Company: ${contact.enrichedData?.company || 'Unknown'}
+- Role: ${contact.enrichedData?.role || 'Unknown'}
+- Interests: ${contact.enrichedData?.interests?.join(', ') || 'Unknown'}
+
+Generate a snapshot:
+{
+  "oneLiner": "Who they are in one sentence",
+  "relationshipSummary": "Your relationship in 2-3 sentences",
+  "talkingPoints": ["3-4 specific things to discuss based on their interests/recent activity"],
+  "conversationStarters": ["2-3 natural opening messages"],
+  "avoidTopics": ["Any topics to avoid based on past interactions"],
+  "bestChannel": "dm/reply/quote",
+  "bestTiming": "When to reach out (morning/afternoon/evening or specific context)",
+  "opportunityAngle": "How this relationship could be valuable (if apparent)",
+  "riskFactors": ["Any concerns about the relationship"],
+  "nextBestAction": {
+    "action": "Specific action to take",
+    "why": "Brief reason",
+    "urgency": "high/medium/low"
+  }
+}
+
+Return ONLY the JSON.`;
+
+  const result = await callAnthropic(systemPrompt, userPrompt);
+
+  if (result.error) return { error: result.error };
+
+  try {
+    const jsonMatch = result.content.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const snapshot = JSON.parse(jsonMatch[0]);
+      return {
+        ...snapshot,
+        relationshipScore: score,
+        generatedAt: Date.now()
+      };
+    }
+  } catch (e) {
+    return { error: 'Failed to parse response' };
+  }
+  return { error: 'Invalid response format' };
+}
+
+// --------------------------------
 // AI PROCESSING SCHEDULER
 // --------------------------------
 
@@ -1312,11 +1719,17 @@ async function runAIProcessing() {
   console.log('[Flock] Running AI processing batch...');
 
   try {
-    // Run auto-tagging
+    // Run relationship scoring (no API calls, fast)
+    await processRelationshipScores();
+
+    // Run auto-tagging (uses API)
     await processUntaggedInteractions();
 
-    // Run event detection
+    // Run event detection (uses API)
     await processContactsForEvents();
+
+    // Run opportunity detection (no API calls, uses scores)
+    await detectOpportunities();
 
     console.log('[Flock] AI processing batch complete');
   } catch (error) {
@@ -1374,6 +1787,38 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     case 'runAIProcessingNow':
       runAIProcessing().then(() => sendResponse({ success: true }));
+      return true;
+
+    case 'getRelationshipScore':
+      calculateRelationshipScore(message.contact, message.interactions)
+        .then(data => sendResponse({ success: true, data }));
+      return true;
+
+    case 'getOpportunities':
+      chrome.storage.local.get(['opportunities', 'opportunitiesUpdatedAt'])
+        .then(result => sendResponse({
+          success: true,
+          data: result.opportunities || [],
+          updatedAt: result.opportunitiesUpdatedAt
+        }));
+      return true;
+
+    case 'detectOpportunitiesNow':
+      detectOpportunities().then(data => sendResponse({ success: true, data }));
+      return true;
+
+    case 'getConversationThreads':
+      analyzeConversationThreads(message.contact, message.interactions)
+        .then(data => sendResponse({ success: !data.error, data, error: data.error }));
+      return true;
+
+    case 'getProfileSnapshot':
+      generateProfileSnapshot(message.contact, message.interactions)
+        .then(data => sendResponse({ success: !data.error, data, error: data.error }));
+      return true;
+
+    case 'refreshRelationshipScores':
+      processRelationshipScores().then(() => sendResponse({ success: true }));
       return true;
 
     // Sync operations
