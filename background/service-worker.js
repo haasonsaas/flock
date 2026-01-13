@@ -865,6 +865,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 
+// ================================
+// AI INTELLIGENCE ENGINE
+// ================================
+
+const AI_PROCESSING_ALARM_NAME = 'flock-ai-processing';
+const AI_PROCESSING_INTERVAL = 60; // Every hour
+
 // Also setup alarms when service worker starts (in case it was terminated)
 setupReminderAlarm();
 setupDailyDigest();
@@ -875,13 +882,6 @@ setupAIProcessingAlarm();
 setTimeout(checkReminders, 5000);
 
 console.log('[Flock] Service worker initialized');
-
-// ================================
-// AI INTELLIGENCE ENGINE
-// ================================
-
-const AI_PROCESSING_ALARM_NAME = 'flock-ai-processing';
-const AI_PROCESSING_INTERVAL = 60; // Every hour
 
 // --------------------------------
 // 1. SMART AUTO-TAGGING

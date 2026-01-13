@@ -66,6 +66,12 @@ body {
   overflow: hidden;
 }
 
+/* Global SVG defaults - prevent unconstrained expansion */
+svg {
+  max-width: 100%;
+  max-height: 100%;
+}
+
 /* Global scanlines */
 body::before {
   content: '';
@@ -1080,6 +1086,9 @@ body::before {
 }
 
 .flock-detail-section h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-family: var(--flock-font-mono);
   font-size: 9px;
   font-weight: 600;
@@ -1089,6 +1098,12 @@ body::before {
   margin-bottom: 8px;
   padding-bottom: 4px;
   border-bottom: 1px dashed var(--flock-border);
+}
+
+.flock-detail-section h3 svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
 }
 
 /* Pipeline Stages - Terminal Style */
@@ -1749,6 +1764,8 @@ body::before {
 .flock-avatar-wrap {
   position: relative;
   flex-shrink: 0;
+  width: 36px;
+  height: 36px;
 }
 
 .flock-strength-ring {
